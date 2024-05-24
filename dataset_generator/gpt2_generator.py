@@ -8,7 +8,7 @@ from os.path import join
 import sys
 import pickle
 import subprocess
-from ghn3.graph import Graph, GraphBatch
+from ghn3.graph import Graph_GPT, GraphBatch
 from ppuda.utils.utils import capacity, set_seed
 
 from transformers import AutoTokenizer, AutoConfig
@@ -103,7 +103,7 @@ while len(graphs) < N:
         continue
     
     params.append(n/1e6)
-    graph = Graph(model, reduce_graph=False)
+    graph = Graph_GPT(model, reduce_graph=False)
     graph.net_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_head}
     graph.config = config
     graphs.append(graph)
