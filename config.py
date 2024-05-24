@@ -66,7 +66,7 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
                         help='image dataset: cifar10/imagenet/PennFudanPed.')
     args = parser.parse_known_args()[0]
     dataset = args.dataset.lower()
-    is_imagenet = dataset.startswith('imagenet')
+    is_imagenet_wiki = dataset.startswith('imagenet') or dataset.startswith('wikitext')
     is_detection = dataset == 'pennfudanped'
 
     parser.add_argument('-D', '--data_dir', type=str, default='./data',
@@ -76,7 +76,7 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
 
     # Generic args
     parser.add_argument('-s', '--seed', type=int, default=1111, help='random seed')
-    parser.add_argument('-w', '--num_workers', type=int, default=8 if is_imagenet else (4 if is_detection else 0),
+    parser.add_argument('-w', '--num_workers', type=int, default=8 if is_imagenet_wiki else (4 if is_detection else 0),
                         help='number of cpu processes to use')
     parser.add_argument('--device', type=str, default=default_device(), help='device: cpu or cuda')
     parser.add_argument('--debug', type=int, default=kwargs.pop('debug', 1),
@@ -92,7 +92,7 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
     # Generic training args
     parser.add_argument('--split', type=str, default=kwargs.pop('split', 'train' if is_train_ghn else 'predefined'),
                         help='training/testing split of DeepNets-1M')
-    parser.add_argument('-i', '--imsize', type=int, default=kwargs.pop('imsize', 224 if is_imagenet else 32),
+    parser.add_argument('-i', '--imsize', type=int, default=kwargs.pop('imsize', 224 if is_imagenet_wiki else 32),
                         help='image size used to train and eval models')
 
     if is_eval or is_train_net:
@@ -108,7 +108,7 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
 
         # Predefine default arguments
         if is_train_ghn:
-            batch_size = 256 if is_imagenet else 64
+            batch_size = 256 if is_imagenet_wiki else 64
             epochs = 300
             lr = 0.6e-3
             wd = 1e-5
@@ -119,10 +119,10 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
                 lr = 0.005
                 wd = 0.0005
             else:
-                batch_size = 128 if is_imagenet else 96
-                epochs = 250 if is_imagenet else 600
-                lr = 0.1 if is_imagenet else 0.0015
-                wd = 3e-5 if is_imagenet else 3e-4
+                batch_size = 128 if is_imagenet_wiki else 96
+                epochs = 250 if is_imagenet_wiki else 600
+                lr = 0.1 if is_imagenet_wiki else 0.0015
+                wd = 3e-5 if is_imagenet_wiki else 3e-4
 
         parser.add_argument('-b', '--batch_size', type=int, default=batch_size, help='image batch size for training')
         parser.add_argument('-e', '--epochs', type=int, default=epochs, help='number of epochs to train')
@@ -144,7 +144,7 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
         parser.add_argument('-g', '--gamma', type=float, default=0.1, help='learning rate decay factor')
         parser.add_argument('--momentum', type=float, default=0.9, help='momentum of SGD')
         parser.add_argument('--layers', type=int, default=kwargs.pop(
-            'layers', 1 if is_train_ghn else (14 if is_imagenet else 20)),
+            'layers', 1 if is_train_ghn else (14 if is_imagenet_wiki else 20)),
                             help='total number of layers in the network/GHN to be trained, default is for DARTS')
 
         if is_train_ghn:
@@ -177,7 +177,7 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
             ### LoRA specific args ###
 
         else:
-            parser.add_argument('--init_channels', type=int, default=48 if is_imagenet else 36,
+            parser.add_argument('--init_channels', type=int, default=48 if is_imagenet_wiki else 36,
                                 help='num of init channels, default is for DARTS')
             parser.add_argument('--auxiliary', action='store_true', default=False, help='use auxiliary tower')
             parser.add_argument('--auxiliary_weight', type=float, default=0.4, help='weight for auxiliary loss')
@@ -198,7 +198,7 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
         args.lr_steps = list(map(int, args.lr_steps.split(',')))
 
     if is_train_ghn:
-        s = 16 if is_imagenet else 11
+        s = 16 # if is_imagenet_wiki else 11
         if args.max_shape is None:
             shape_multiplier = kwargs.pop('shape_multiplier', 2.0)  # default is hid * 2 in GHN-2
             args.max_shape = (int(args.hid * shape_multiplier), int(args.hid * shape_multiplier), s, s)
