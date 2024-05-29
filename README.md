@@ -1,5 +1,5 @@
 # LoGAH
-This is for the paper **LoGAH: Predicting 774-Million-Parameter Transformers using Graph HyperNetworks with $\frac{1}{100}$ Parameters**
+This is for the paper [**LoGAH: Predicting 774-Million-Parameter Transformers using Graph HyperNetworks with $\frac{1}{100}$ Parameters**](https://arxiv.org/abs/2405.16287).
 
 ## Requirements
 Please git clone [Parameter Prediction for Unseen Deep Architectures](https://github.com/facebookresearch/ppuda/tree/main) first and prepare the running environments, then git clone this repo under that folder.
@@ -15,6 +15,8 @@ at  `traverse_graph` function  in `ghn3/graph.py` to
 var = self.model(**tokenizer("Hello, my dog is cute", return_tensors="pt")).logits
 ```
 in order to support language models. We provided the modified `graph.py` in `ghn3` folder for your convenience.
+
+> Note that: It could be a large file when generating the original datasets, one solution is to generate a similar dataset with smaller models sizes, and in the corresponding `trainer.py` you randomly generate the original size of model for training. Refer to the commented code in `trainer.py` for more details.
 
 ## LoGAH
 We provide the LoGAH in `nn.py` in `ghn3` folder, where we introduce the low-rank decoder, as well as the modified `trainer.py` for our paper. We also modify the `config.py` in `ppuda` by adding the hyperparameter such as `--lora_r` used in LoGAH. The trainer for GPT-1K datasets is shown in `trainer_gpt2.py`.
