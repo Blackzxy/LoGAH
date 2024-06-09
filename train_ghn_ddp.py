@@ -153,7 +153,7 @@ def main():
     cnt = 0
     start_time = time.time()
     for epoch in range(trainer.start_epoch, args.epochs):
-        if cnt>=1:
+        if cnt>=300:
             break
         cnt+=1
 
