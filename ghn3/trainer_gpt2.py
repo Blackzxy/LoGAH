@@ -24,7 +24,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim.lr_scheduler import StepLR, MultiStepLR, CosineAnnealingLR, LambdaLR
 from ppuda.utils import AvgrageMeter, accuracy, capacity, init
 from ppuda.ghn.nn import GHN
-from .graph import Graph, GraphBatch
+from .graph import Graph, GraphBatch, Graph_GPT
 from .utils import Logger, print_grads, log
 from .ddp_utils import is_ddp, get_ddp_rank, avg_ddp_metric
 from .nn import from_pretrained
@@ -354,7 +354,7 @@ class Trainer:
                             #     return var
                             # net.get_var = get_var
                             
-                            graph = Graph(net, reduce_graph=True, verbose=False)
+                            graph = Graph_GPT(net, reduce_graph=True, verbose=False)
                             
                             graphs2.append(graph)
                             models.append(net)
