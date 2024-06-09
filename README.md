@@ -39,7 +39,8 @@ For predicting the parameters for ViT and GPT-2, we provide `eval_ghn.py` and `e
 ```python
 python eval_ghn.py -d cifar100 --ckpt checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/checkpoint.pt --save checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/c100_vit_epoch300_L24_H16_C1024_init.pt --split torch
 ```
-> Note: Please change the config settings according to ViT-S/B/L and GPT-2 S/M/L for your own experiments. You can check it in `eval_ghn.py` and `eval_ghn_for_gpt2.py`, respectively.
+> Note: Please change the config settings according to ViT-S/B/L and GPT-2 S/M/L for your own experiments. You can check it in `eval_ghn.py` and `eval_ghn_for_gpt2.py`, respectively. Besides, since in the eval scripts we use `from_pretrained` function in `nn.py`, so please also set `ghn = GHN3(**ghn_config, **kwargs)` in this function when evaluating the ViTs, or set `ghn = GHN3_GPT(**ghn_config, **kwargs)` when evaluating the GPT-2.
+
 
 
 ## Training ViTs and GPTs
