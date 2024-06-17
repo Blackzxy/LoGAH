@@ -129,7 +129,7 @@ for m_ind, m in enumerate(models_queue):
             
             # kw_args = {'init_weights': False} if m in ['googlenet', 'inception_v3'] else {}
             # model = eval(f'models.{m}(num_classes=num_classes, **kw_args)').to(args.device)
-            patch_size = 16 #2 for cifar, 16 for imagenet
+            patch_size = 2 #2 for cifar, 16 for imagenet
             layers = 12
             heads = 12
             C = 768
@@ -140,7 +140,7 @@ for m_ind, m in enumerate(models_queue):
                     'num_heads': heads,
                     'hidden_dim': C,
                     'mlp_dim': mlp_dim,
-                    'num_classes': 1000 if is_imagenet else 100,
+                    'num_classes': 1000 if is_imagenet else 10,
                     'image_size': 224 if is_imagenet else 32,
             }
             print(kw_args)

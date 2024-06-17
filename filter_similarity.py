@@ -15,9 +15,8 @@ from tqdm import tqdm
 from ppuda.utils import capacity
 # from ppuda.ghn.nn import GHN
 
-from ghn_lora.ghn3.nn import GHN3
-#from ghn_lora.ghn3.nn import from_pretrained, get_metadata
-from ghn3.ghn3.nn import from_pretrained
+from ghn3.nn import GHN3
+from ghn3.nn import from_pretrained, get_metadata
 from ghn3.graph import GraphBatch
 from sklearn.metrics import pairwise_distances
 from scipy.optimize import linear_sum_assignment

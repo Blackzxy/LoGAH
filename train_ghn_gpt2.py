@@ -67,7 +67,7 @@ def main():
     parser.add_argument('--ghn2', action='store_true', help='train GHN-2, also can use code from'
                                                             ' https://github.com/facebookresearch/ppuda to train GHN-2')
     parser.add_argument('--interm_epoch', type=int, default=5, help='intermediate epochs to keep checkpoints for')
-    parser.add_argument('--dataset_config_name', type=str, default='wikitext-103-raw-v1', help='dataset config name')
+    parser.add_argument('--dataset_config_name', type=str, default='wikitext-2-raw-v1', help='dataset config name')
     parser.add_argument('--model_name', type=str, default='gpt2', help='model name')
     parser.add_argument('--use_slow_tokenizer', action='store_true', help='use slow tokenizer')
     parser.add_argument('--block_size', type=int, default=None, help='block size')
@@ -160,7 +160,7 @@ def main():
     hid = args.hid
     s = 16
     ### You can change the max_shape here
-    dmax_shape = 2048 * 2
+    dmax_shape = 2048
 
     #default_max_shape = (hid * 2, hid * 2, s, s) if ghn2 else (hid, hid, s, s)
     default_max_shape = (dmax_shape, dmax_shape, s, s) if ghn2 else (dmax_shape, dmax_shape, s, s)
@@ -224,7 +224,7 @@ def main():
 
     cnt = 0
     for epoch in range(trainer.start_epoch, args.epochs):
-        if cnt>=300:
+        if cnt>=1:
             break
         cnt+=1
 

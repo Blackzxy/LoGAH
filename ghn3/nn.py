@@ -118,7 +118,8 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
             assert is_ghn2 == ghn_config['is_ghn2'], ('invalid GHN config', ghn_config)
         else:
             ghn_config['is_ghn2'] = is_ghn2
-    ghn = GHN3(**ghn_config, **kwargs)
+    #ghn = GHN3(**ghn_config, **kwargs)
+    ghn = GHN3_GPT(**ghn_config, **kwargs)
 
     if is_ghn2:
         for n, p in state_dict.items():
@@ -803,6 +804,7 @@ class GHN3(GHN):
             nn.init.trunc_normal_(module.weight.data, std=d ** (-0.5))
         return
 
+
 class GHN3_GPT(GHN):
     r"""
     Improved Transformer-based Graph HyperNetwork (GHN-3) based on the paper
@@ -844,12 +846,10 @@ class GHN3_GPT(GHN):
 
         # For non-lora GHN, max_shape = k, k, 11/16, 11/16, where k=64
         # self.shape_enc (ShapeEncoder) only uses max_shape[3] so k is irrelevant with lora and we can ignore it
-        #### NOTE: For Training GPT-1K
         self.shape_enc = LLMShapeEncoder(hid=hid,
                                          num_classes=num_classes,
                                         max_shape=max_shape,
                                         debug_level=kwargs.get('debug_level', 0))
-        #### NOTE: For Training GPT-1K
 
         # Decoder for 4D c_out x c_in x k_out x k_in conv weights and 2D c_out x c_in Linear weights
         self.lora = lora
@@ -940,10 +940,7 @@ class GHN3_GPT(GHN):
         if not is_lst:
             nets_torch = [nets_torch]
 
-        #### NOTE: For Training GPT-1K
         self.config_n_layer = nets_torch[0].config.n_layer
-        #### NOTE: For Training GPT-1K
-
         if graphs is None:
             graphs = GraphBatch([Graph_GPT(net, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
                                 dense=self.is_dense()).to_device(device)
@@ -1321,11 +1318,8 @@ class GHN3_GPT(GHN):
         :return: normalized predicted tensor
         """
         if p.dim() > 1:
-
-            #### NOTE: For Training GPT-1K
             if isinstance(module, nn.Embedding):
                 return p
-            #### NOTE: For Training GPT-1K
 
             sz = p.shape
 
@@ -1346,12 +1340,10 @@ class GHN3_GPT(GHN):
             # p = p * (beta / (sz[0] * p[0, 0].numel())) ** 0.5
 
             # fan-in:
-            #### NOTE: For Training GPT-1K
             if param_name.endswith('c_proj.weight'):
                 p = (p * (beta / p[0].numel()) ** 0.5) / math.sqrt(2 * self.config_n_layer)
             else:
                 p = p * (beta / p[0].numel()) ** 0.5
-            #### NOTE: For Training GPT-1K
 
         else:
 
@@ -1482,6 +1474,7 @@ class GHN3_GPT(GHN):
             d = module.weight.shape[1]
             nn.init.trunc_normal_(module.weight.data, std=d ** (-0.5))
         return
+
 
 
 # Simple MLP with LoRA
