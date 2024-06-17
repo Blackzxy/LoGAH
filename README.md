@@ -26,18 +26,18 @@ You can follow the instructions in [GHN-3](https://github.com/SamsungSAILMontrea
 
 For example:
 ```python
-python train_ghn_ddp.py -n -v 50 --ln --amp -m 1 --name ghn-logah-r90-hid128-m1-layers5-heads16-clip5 -d cifar100 --hid 128 --lora_r 90 --layers 5 --heads 16 --opt adamw --lr 0.3e-3 --wd 1e-2 --scheduler cosine-warmup --debug 0 --max_shape 2048 --lora
+python LoGAH/train_ghn_ddp.py -n -v 50 --ln --amp -m 1 --name ghn-logah-r90-hid128-m1-layers5-heads16-clip5 -d cifar100 --hid 128 --lora_r 90 --layers 5 --heads 16 --opt adamw --lr 0.3e-3 --wd 1e-2 --scheduler cosine-warmup --debug 0 --max_shape 2048 --lora
 ```
 Or if you want to train on multiple GPUs, you can use the `torchrun` to do that:
 ```python
-torchrun --standalone --nnodes=1 --nproc_per_node=2 train_ghn_gpt2.py -n -v 50 --ln --amp -m 2  --name ghn-gpt2-lora-wiki103-r32-hid64-layers3-heads8-m2 -d wikitext --hid 64 --lora_r 32 --layers 3 --heads 8 --opt adamw --lr 0.3e-3 --wd 1e-2 --scheduler cosine-warmup --debug 0 --max_shape 2048 --lora --batch_size 6
+torchrun --standalone --nnodes=1 --nproc_per_node=2 LoGAH/train_ghn_gpt2.py -n -v 50 --ln --amp -m 2  --name ghn-gpt2-lora-wiki103-r32-hid64-layers3-heads8-m2 -d wikitext --hid 64 --lora_r 32 --layers 3 --heads 8 --opt adamw --lr 0.3e-3 --wd 1e-2 --scheduler cosine-warmup --debug 0 --max_shape 2048 --lora --batch_size 6
 ```
 If you encounter the hanging issue, please add the command `export NCCL_P2P_DISABLE=1` before running the experiments.
 
 ## Predict Parameters
 For predicting the parameters for ViT and GPT-2, we provide `eval_ghn.py` and `eval_ghn_for_gpt2.py` respectively. For example:
 ```python
-python eval_ghn.py -d cifar100 --ckpt checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/checkpoint.pt --save checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/c100_vit_epoch300_L24_H16_C1024_init.pt --split torch
+python LoGAH/eval_ghn.py -d cifar100 --ckpt checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/checkpoint.pt --save checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/c100_vit_epoch300_L24_H16_C1024_init.pt --split torch
 ```
 > Note: Please change the config settings according to ViT-S/B/L and GPT-2 S/M/L for your own experiments. You can check it in `eval_ghn.py` and `eval_ghn_for_gpt2.py`, respectively. Besides, since in the eval scripts we use `from_pretrained` function in `nn.py`, so please also set `ghn = GHN3(**ghn_config, **kwargs)` in this function when evaluating the ViTs, or set `ghn = GHN3_GPT(**ghn_config, **kwargs)` when evaluating the GPT-2.
 
@@ -48,7 +48,7 @@ We provide the training scripts for ViT and GPT-2 respectively, `train_vit.py` a
 
 For training ViT from our prediction, you can use the following command:
 ```python
-python train_vit.py --split predefined --arch 0 --epochs 100 -d cifar100 --batch_size 32 --opt adamw --lr 0.04e-3 --wd 1e-2 --ckpt  checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/c100_vit_epoch300_L24_H16_C1024_init.pt
+python LoGAH/train_vit.py --split predefined --arch 0 --epochs 100 -d cifar100 --batch_size 32 --opt adamw --lr 0.04e-3 --wd 1e-2 --ckpt  checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/c100_vit_epoch300_L24_H16_C1024_init.pt
 ```
 
 For training GPT-2, we also ulitise the DeepSpeed:
@@ -56,5 +56,5 @@ For training GPT-2, we also ulitise the DeepSpeed:
 export NCCL_P2P_DISABLE=1
 export NCCL_IB_DISABLE=1
 
-deepspeed --master_port 12345 --include localhost:2,3,4,5,6,7 ghn_lora/train_gpt2.py --fp16 --dataset_name wikitext --dataset_config_name wikitext-103-raw-v1 --learning_rate 3e-6 --weight_decay 1e-2 --warmup_steps 500 --preprocessing_num_workers 8  --num_train_epochs 100 --deepspeed ds_config_1gpu.json --per_device_train_batch_size 2 --per_device_eval_batch_size 2  --config_name gpt2-large --tokenizer_name gpt2-large --do_train --do_eval --output_dir ./wikitext103-GPTLarge
+deepspeed --master_port 12345 --include localhost:2,3,4,5,6,7 LoGAH/train_gpt2.py --fp16 --dataset_name wikitext --dataset_config_name wikitext-103-raw-v1 --learning_rate 3e-6 --weight_decay 1e-2 --warmup_steps 500 --preprocessing_num_workers 8  --num_train_epochs 100 --deepspeed ds_config_1gpu.json --per_device_train_batch_size 2 --per_device_eval_batch_size 2  --config_name gpt2-large --tokenizer_name gpt2-large --do_train --do_eval --output_dir ./wikitext103-GPTLarge
 ```
