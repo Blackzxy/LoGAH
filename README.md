@@ -43,7 +43,7 @@ python LoGAH/eval_ghn.py -d cifar100 --ckpt checkpoints/ghn-c100-lora-r32-hid64-
 ```
 > Note: Please change the config settings according to ViT-S/B/L and GPT-2 S/M/L for your own experiments. You can check it in `eval_ghn.py` and `eval_ghn_for_gpt2.py`, respectively. Besides, since in the eval scripts we use `from_pretrained` function in `nn.py`, so please also set `ghn = GHN3(**ghn_config, **kwargs)` in this function when evaluating the ViTs, or set `ghn = GHN3_GPT(**ghn_config, **kwargs)` when evaluating the GPT-2.
 
-Moreover, to get predicted parameters for different ViTs, please modify the corresponding number of layers, heads and hidden dim in `eval_ghn.py` and `eval_ghn_for_gpt2.py` for your own experiments.
+Moreover, to get predicted parameters for different ViTs, please modify the corresponding number of layers, heads and hidden dim in `eval_ghn.py` and `eval_ghn_for_gpt2.py` for your own experiments (same for GPT-2 models).
 
 
 
