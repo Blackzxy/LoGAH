@@ -16,7 +16,7 @@ import sys
 import pickle
 import subprocess
 import joblib
-from ghn3.graph import Graph_GPT
+from ghn3.graph import Graph
 from ppuda.utils.utils import capacity, set_seed
 from torchvision.models.vision_transformer import _vision_transformer
 
@@ -103,7 +103,7 @@ def main():
         #     continue
 
         params.append(n / 10 ** 6)
-        graph = Graph_GPT(model, ve_cutoff=250, dense=True, list_all_nodes=True)
+        graph = Graph(model, ve_cutoff=250, dense=True, list_all_nodes=True)
 
         A = graph._Adj.cpu().numpy().astype(np.uint8)
         net_args['num_nodes'] = int(A.shape[0])

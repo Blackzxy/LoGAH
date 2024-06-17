@@ -32,7 +32,7 @@ python LoGAH/train_ghn_ddp.py -n -v 50 --ln --amp -m 1 --name ghn-logah-r90-hid1
 ```
 Or if you want to train on multiple GPUs, you can use the `torchrun` to do that:
 ```python
-torchrun --standalone --nnodes=1 --nproc_per_node=2 LoGAH/train_ghn_gpt2.py -n -v 50 --ln --amp -m 2  --name ghn-gpt2-lora-wiki103-r32-hid64-layers3-heads8-m2 -d wikitext --hid 64 --lora_r 32 --layers 3 --heads 8 --opt adamw --lr 0.3e-3 --wd 1e-2 --scheduler cosine-warmup --debug 0 --max_shape 2048 --lora --batch_size 6
+torchrun --standalone --nnodes=1 --nproc_per_node=2 LoGAH/train_ghn_gpt2.py -n -v 50 --ln --amp -m 2  --name ghn-gpt2-lora-wiki103-r32-hid64-layers3-heads8-m2 -d wikitext --hid 64 --lora_r 32 --layers 3 --heads 8 --opt adamw --lr 0.3e-3 --wd 1e-2 --scheduler cosine-warmup --debug 0 --max_shape 2048 --lora --batch_size 6 -d wikitext
 ```
 If you encounter the hanging issue, please add the command `export NCCL_P2P_DISABLE=1` before running the experiments.
 
