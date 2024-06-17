@@ -28,7 +28,7 @@ from ppuda.utils import adjust_net, rand_choice
 # from ppuda.vit1m.ops import *
 # from ppuda.vit1m.net import Network
 # from ppuda.vit1m.graph import Graph, GraphBatch
-from ghn_lora.ghn3.graph import Graph, GraphBatch
+from ghn3.graph import Graph_GPT, GraphBatch
 
 
 MAX_NODES_BATCH = 2200  # to fit larger meta batches into GPU memory (decreasing this number further may create a bias towards smaller architectures)
@@ -171,7 +171,7 @@ class DeepNets1M(torch.utils.data.Dataset):
                 'image_size': 224 if self.large_images else 32,
         }
         model = adjust_net(_vision_transformer(weights=None,progress=False, **kw_args),large_input=self.large_images)
-        graph = Graph(model, ve_cutoff=250, dense=True)
+        graph = Graph_GPT(model, ve_cutoff=250, dense=True)
         graph.net_args = kw_args
         graphs.append(graph)
         return graphs
@@ -272,7 +272,7 @@ class GPT2_1K(torch.utils.data.Dataset):
         )
         kw_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_head}
         model = GPT2LMHeadModel(config)
-        graph = Graph(model, ve_cutoff=250, dense=True)
+        graph = Graph_GPT(model, ve_cutoff=250, dense=True)
         graph.net_args = kw_args
         graphs.append(graph)
         return graphs

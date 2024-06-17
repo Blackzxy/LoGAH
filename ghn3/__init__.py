@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from .graph import Graph, GraphBatch
+from .graph import Graph_GPT, GraphBatch
 from .utils import *
 from .ddp_utils import *
 from .nn import *

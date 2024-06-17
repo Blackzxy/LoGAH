@@ -167,11 +167,11 @@ def init_config(mode='eval', parser=None, verbose=True, **kwargs):
                                 help='max shape "c_out[,c_in][,height][,width]" of the predicted parameters. '
                                      'If None, max_shape will be calculated based on shape_multiplier and the '
                                      '--dataset argument and  according to the hyperparameters in the GHN-2 papers.')
-            parser.add_argument('--ema', action='store_true', default=False)
+            parser.add_argument('--ema', action='store_true', default=False, help='use EMA')
             parser.add_argument('--ema_rate', type=float, default=0.999)
             ### LoRA specific args ###
             parser.add_argument('--lora', action='store_true', default=True, help='use LoRA')
-            parser.add_argument('--lora_r', type=float, default=128, help='percentage of r')
+            parser.add_argument('--lora_r', type=float, default=128, help='rank of r')
             parser.add_argument('--max_ck_lora', type=int, default=2048 * 16, help='max ck for LoRA')
             parser.add_argument('--use_1d-decoder', action='store_true', default=False, help='use 1d decoder')
             ### LoRA specific args ###

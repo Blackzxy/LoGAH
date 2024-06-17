@@ -21,8 +21,8 @@ from functools import partial
 from torch.utils.data.distributed import DistributedSampler
 from ppuda.utils import rand_choice
 from genotypes import from_dict, PRIMITIVES_DEEPNETS1M
-from ghn_lora.loader import GPT2_1K, NetBatchSampler, MAX_NODES_BATCH
-from .graph import Graph, GraphBatch
+from loader import GPT2_1K, NetBatchSampler, MAX_NODES_BATCH
+from .graph import Graph_GPT, GraphBatch
 from .utils import log
 from .ddp_utils import is_ddp
 from .ops import NetworkLight
