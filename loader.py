@@ -77,7 +77,7 @@ class DeepNets1M(torch.utils.data.Dataset):
             # self.nodes = torch.tensor([net.n_nodes for net in self.nets])
         else:
             self.pk_data = None
-            self.pk_file = os.path.join(nets_dir, 'test-ViTs1K_%s.pkl' % (split if split in ['train', 'search'] else 'eval'))
+            self.pk_file = os.path.join(nets_dir, 'ViTs1K_%s.pkl' % (split if split in ['train', 'search'] else 'eval'))
             print(self.pk_file)
             assert os.path.exists(self.pk_file), ('%s not found' % self.pk_file)
             with open(self.pk_file, 'rb') as f:
