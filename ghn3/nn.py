@@ -27,7 +27,7 @@ from ppuda.ghn.nn import GHN, ConvDecoder
 from ppuda.ghn.mlp import MLP
 from ppuda.utils import capacity
 from ppuda.deepnets1m.net import named_layered_modules
-from .graph import Graph_GPT, GraphBatch, Graph_GPT
+from .graph import Graph_GPT, GraphBatch, Graph
 from .utils import log
 from .ops import TransformerLayer as GraphormerLayer
 
@@ -275,10 +275,10 @@ class GHN3(GHN):
 
 
         if graphs is None:
-            graphs = GraphBatch([Graph_GPT(net, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
+            graphs = GraphBatch([Graph(net, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
                                 dense=self.is_dense()).to_device(device)
-        elif isinstance(graphs, Graph_GPT) or isinstance(graphs, (list, tuple)):
-            graphs = GraphBatch([graphs] if isinstance(graphs, Graph_GPT) else graphs,
+        elif isinstance(graphs, Graph) or isinstance(graphs, (list, tuple)):
+            graphs = GraphBatch([graphs] if isinstance(graphs, Graph) else graphs,
                                 dense=self.is_dense()).to_device(device)
 
         if isinstance(graphs, GraphBatch):
