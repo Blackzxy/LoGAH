@@ -131,8 +131,8 @@ for m_ind, m in enumerate(models_queue):
             # model = eval(f'models.{m}(num_classes=num_classes, **kw_args)').to(args.device)
             patch_size = 2 #2 for cifar, 16 for imagenet
             layers = 12
-            heads = 12
-            C = 768
+            heads = 6
+            C = 384
             mlp_dim = int(C * 4)  
             kw_args = {
                     'patch_size': patch_size,
@@ -140,7 +140,7 @@ for m_ind, m in enumerate(models_queue):
                     'num_heads': heads,
                     'hidden_dim': C,
                     'mlp_dim': mlp_dim,
-                    'num_classes': 1000 if is_imagenet else 10,
+                    'num_classes': 1000 if is_imagenet else 100,
                     'image_size': 224 if is_imagenet else 32,
             }
             print(kw_args)

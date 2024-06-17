@@ -31,7 +31,7 @@ from .graph import Graph_GPT, GraphBatch, Graph
 from .utils import log
 from .ops import TransformerLayer as GraphormerLayer
 
-print("######################## nn from LoRA_GHN ########################")
+print("######################## nn from LoGAH ########################")
 
 
 def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
@@ -118,8 +118,8 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
             assert is_ghn2 == ghn_config['is_ghn2'], ('invalid GHN config', ghn_config)
         else:
             ghn_config['is_ghn2'] = is_ghn2
-    #ghn = GHN3(**ghn_config, **kwargs)
-    ghn = GHN3_GPT(**ghn_config, **kwargs)
+    ghn = GHN3(**ghn_config, **kwargs)
+    #ghn = GHN3_GPT(**ghn_config, **kwargs)
 
     if is_ghn2:
         for n, p in state_dict.items():

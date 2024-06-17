@@ -24,6 +24,8 @@ We provide the LoGAH in `nn.py` in `ghn3` folder, where we introduce the low-ran
 ## Training LoGAH
 You can follow the instructions in [GHN-3](https://github.com/SamsungSAILMontreal/ghn3/tree/main) to run the training on multiple GPUs. For training LoGAH on ViTs-1K, please use `train_ghn_ddp.py`; for training it on GPTs-1K, please use `train_ghn_gpt2.py`.
 
+> Note: For different datsets (i.e. CIFAR-10, CIFAR-100, and ImageNets), the number of classes is $10, 100, 1000$ respectively. Please also modify the corresponding number in `ghn3/trainer.py` in `update` function.
+
 For example:
 ```python
 python LoGAH/train_ghn_ddp.py -n -v 50 --ln --amp -m 1 --name ghn-logah-r90-hid128-m1-layers5-heads16-clip5 -d cifar100 --hid 128 --lora_r 90 --layers 5 --heads 16 --opt adamw --lr 0.3e-3 --wd 1e-2 --scheduler cosine-warmup --debug 0 --max_shape 2048 --lora
@@ -40,6 +42,8 @@ For predicting the parameters for ViT and GPT-2, we provide `eval_ghn.py` and `e
 python LoGAH/eval_ghn.py -d cifar100 --ckpt checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/checkpoint.pt --save checkpoints/ghn-c100-lora-r32-hid64-m8-layers3-heads8-clip5/c100_vit_epoch300_L24_H16_C1024_init.pt --split torch
 ```
 > Note: Please change the config settings according to ViT-S/B/L and GPT-2 S/M/L for your own experiments. You can check it in `eval_ghn.py` and `eval_ghn_for_gpt2.py`, respectively. Besides, since in the eval scripts we use `from_pretrained` function in `nn.py`, so please also set `ghn = GHN3(**ghn_config, **kwargs)` in this function when evaluating the ViTs, or set `ghn = GHN3_GPT(**ghn_config, **kwargs)` when evaluating the GPT-2.
+
+Moreover, to get predicted parameters for different ViTs, please modify the corresponding number of layers, heads and hidden dim in `eval_ghn.py` and `eval_ghn_for_gpt2.py` for your own experiments.
 
 
 
