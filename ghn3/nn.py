@@ -59,6 +59,7 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
         if 'config' in state_dict:
             ghn_config = state_dict['config']
         state_dict = state_dict['state_dict']
+        print(state_dict.keys())    
 
     is_ghn2 = np.any([p_name.find('gnn.gru.') >= 0 for p_name in state_dict.keys()])
 
@@ -805,6 +806,7 @@ class GHN3(GHN):
         return
 
 
+
 class GHN3_GPT(GHN):
     r"""
     Improved Transformer-based Graph HyperNetwork (GHN-3) based on the paper
@@ -940,7 +942,8 @@ class GHN3_GPT(GHN):
         if not is_lst:
             nets_torch = [nets_torch]
 
-        self.config_n_layer = nets_torch[0].config.n_layer
+        #self.config_n_layer = nets_torch[0].config.n_layer ## for GPT
+        self.config_n_layer = nets_torch[0].config.num_hidden_layers ## for Llama
         if graphs is None:
             graphs = GraphBatch([Graph_GPT(net, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
                                 dense=self.is_dense()).to_device(device)
@@ -1495,7 +1498,7 @@ class ConvDecoder3LoRA(nn.Module):
                        hid=(*hid, r*2*r), # Changed to 2*r*r
                        activation='relu',
                        last_activation=None)
-
+        #self.l1 = nn.Linear(r,int(r))
         self.l2 = nn.Linear(int(r), ck)
         self.relu = nn.ReLU(inplace=True)
         
