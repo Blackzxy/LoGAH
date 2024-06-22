@@ -94,7 +94,8 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=not args.use_slow_tokenizer)
     config = AutoConfig.from_pretrained(args.model_name)
-    raw_datasets = load_dataset(args.dataset,args.dataset_config_name)
+    #raw_datasets = load_dataset(args.dataset,args.dataset_config_name) ## For WikiText
+    raw_datasets = load_dataset(args.dataset) # For OpenWebText
     # Preprocess the dataset
     # Tokenize all the texts
     column_names = raw_datasets['train'].column_names
@@ -140,8 +141,14 @@ def main():
         desc=f"Grouping texts in chunks of {block_size}",
     )
     
-    train_dataset = lm_datasets["train"]
-    eval_dataset = lm_datasets["validation"]
+    # # WikiText
+    # train_dataset = lm_datasets["train"]
+    # eval_dataset = lm_datasets["validation"]
+
+    # For OpenWebText
+    split_dataset = lm_datasets["train"].train_test_split(test_size=0.0005, seed=2357, shuffle=True)
+    train_dataset = split_dataset["train"]
+    eval_dataset = split_dataset["test"]
     ## create dataloader
     train_dataloader = DataLoader(
         train_dataset, shuffle=True, 
