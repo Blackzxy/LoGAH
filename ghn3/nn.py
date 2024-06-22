@@ -34,10 +34,11 @@ from .ops import TransformerLayer as GraphormerLayer
 print("######################## nn from LoGAH ########################")
 
 
-def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
+def from_pretrained(ghn3_name='ghn3xlm16.pt', max_shape=128, **kwargs):
     """
     Loads a pretrained GHN-3 or GHN-2 model.
     :param ghn3_name: model name from https://huggingface.co/SamsungSAILMontreal/ghn3 or a local file path
+    :param max_shape: used to avoid OOM resulted from the decoder in the base GHN model
     :param kwargs: extra GHN arguments
     :return: GHN model (in the training mode by default)
     """
@@ -51,6 +52,7 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
         log('loading %s...' % ghn3_name)
 
     ghn_config = None
+    max_shape_org = None
     try:
         state_dict = joblib.load(hf_hub_download(repo_id='SamsungSAILMontreal/ghn3', filename=ghn3_name))
     except huggingface_hub.utils.HfHubHTTPError as e:
@@ -59,7 +61,11 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
         if 'config' in state_dict:
             ghn_config = state_dict['config']
         state_dict = state_dict['state_dict']
-        print(state_dict.keys())    
+        print(state_dict.keys())
+        if 'lora' in ghn_config and ghn_config['lora']:
+            max_shape_org = ghn_config['max_shape']
+            # use small value for max_shape because otherwise the base GHN model creates a huge decoder
+            ghn_config['max_shape'] = (max_shape, max_shape, 16, 16)
 
     is_ghn2 = np.any([p_name.find('gnn.gru.') >= 0 for p_name in state_dict.keys()])
 
@@ -121,7 +127,9 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
             ghn_config['is_ghn2'] = is_ghn2
     #ghn = GHN3(**ghn_config, **kwargs) ## for ViT experiments
     ghn = GHN3_GPT(**ghn_config, **kwargs)## for GPT-2 experiments
-
+    print(ghn, flush=True)
+    print('num_params', sum([p.numel() for p in ghn.parameters()]), flush=True)
+    print('total param norm', sum([p.norm() for p in ghn.parameters()]), flush=True)
     if is_ghn2:
         for n, p in state_dict.items():
             if n.find('decoder.') >= 0 and p.dim() == 4:
@@ -139,8 +147,10 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', **kwargs):
     if not is_ghn2:
         ghn.fix_embed_layers()
 
+    if max_shape_org is not None:
+        ghn.max_shape = max_shape_org
+        print('ghn.max_shape', ghn.max_shape, flush=True)
     return ghn, ghn_config, state_dict
-
 
 
 class GHN3(GHN):
