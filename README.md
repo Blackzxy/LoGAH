@@ -18,6 +18,9 @@ in order to support language models. We provided the modified `graph.py` in `ghn
 
 > Note that: It could be a large file when generating the original datasets, one solution is to generate a similar dataset with smaller models sizes, and in the corresponding `trainer.py` you randomly generate the original size of model for training. Refer to the commented code in `trainer.py` for more details.
 
+> PS. If you encounter the module loading issue, please copy the `gpt2_generator.py` and `vit_generator.py` to the `LoGAH` folder, and run the code.
+
+
 ## LoGAH
 We provide the LoGAH in `nn.py` in `ghn3` folder, where we introduce the low-rank decoder, as well as the modified `trainer.py` for our paper. We also modify the `config.py` in `ppuda` by adding the hyperparameter such as `--lora_r` used in LoGAH. The trainer for GPT-1K datasets is shown in `trainer_gpt2.py`.
 
