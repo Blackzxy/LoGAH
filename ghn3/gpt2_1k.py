@@ -66,7 +66,7 @@ class GPT2_1KDDP(GPT2_1K):
                                              batch_size=1,
                                              pin_memory=False,
                                              collate_fn=partial(GraphBatch, dense=dense),
-                                             num_workers=n_w)
+                                             num_workers=0)
         return (loader, sampler) if nets.is_train else loader  # need to return sampler for distributed training
 
     def __getitem__(self, idx):
@@ -102,3 +102,20 @@ class NetBatchSamplerDDP(NetBatchSampler):
         return (self.max_nodes_batch is None or
                 (self.sampler.dataset if is_ddp() else self.sampler.data_source).nodes[batch].sum() <=
                 self.max_nodes_batch)
+    def __iter__(self):
+        epoch = 0
+        while True:  # infinite sampler
+            if is_ddp():
+                log(f'shuffle train loader: set seed to {self.sampler.seed}, epoch to {epoch}')
+                self.sampler.set_epoch(epoch)
+            batch = []
+            for idx in self.sampler:
+                batch.append(idx)
+                if len(batch) == self.batch_size:
+                    if self.check_batch(batch):
+                        yield batch
+                    batch = []
+            if len(batch) > 0 and not self.drop_last:
+                if self.check_batch(batch):
+                    yield batch
+            epoch += 1
