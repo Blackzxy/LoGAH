@@ -1600,7 +1600,7 @@ class LLMShapeEncoder(nn.Module):
         self.debug_level = debug_level
         self.num_classes = num_classes
         self.ch_steps = (2**3, 2**6, 2**12, 2**13)
-        self.channels = np.unique([1, 3, num_classes, 50257] +
+        self.channels = np.unique([1, 3, num_classes, 50257, 50304] +
                                   list(range(self.ch_steps[0], self.ch_steps[1], 2**3)) +
                                   list(range(self.ch_steps[1], self.ch_steps[2], 2**4)) +
                                   list(range(self.ch_steps[2], self.ch_steps[3] + 1, 2**5)))
