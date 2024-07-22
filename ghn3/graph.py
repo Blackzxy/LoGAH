@@ -19,10 +19,10 @@ import torch
 import torch.nn as nn
 import networkx as nx
 import transformers
-from transformers import AutoTokenizer, AutoConfig
 import torchvision
 import torchvision.models as models
 import torch.nn.functional as F
+from transformers import AutoModelForCausalLM, GPT2Config, AutoTokenizer
 import ppuda.deepnets1m.ops as ppuda_ops
 from .ops import Network, PosEnc
 from torch.nn.parallel.scatter_gather import Scatter as _scatter
@@ -30,11 +30,32 @@ from ppuda.deepnets1m.net import get_cell_ind, named_layered_modules, Network as
 from ppuda.deepnets1m.genotypes import PRIMITIVES_DEEPNETS1M
 
 
+PRIMITIVES_DEEPNETS1M = [
+    'max_pool',
+    'avg_pool',
+    'sep_conv',
+    'dil_conv',
+    'conv',
+    'msa',
+    'cse',
+    'sum',
+    'concat',
+    'input',
+    'bias',
+    'bn',
+    'ln',
+    'pos_enc',
+    'glob_avg',
+    'rmsnorm',
+    'rot_emb',
+    'gate',
+]
+
 import sys
 sys.setrecursionlimit(10000)  # for large models like efficientnet_v2_l
 
 t_long = torch.long
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
+
 
 class GraphBatch:
     r"""
@@ -489,7 +510,6 @@ class Graph:
                 var = self.model.get_var()
             else:
                 var = self.model(torch.randn(2, *self.expected_input_sz, device=device))
-                #var = self.model(**tokenizer("Hello, my dog is cute", return_tensors="pt")).logits
 
             if not isinstance(var, (tuple, list, dict)):
                 var = [var]
@@ -1103,6 +1123,10 @@ class Graph:
         else:
             plt.show()
 
+### Specify Llama model's tokenizer
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7B-hf")
+### Specify Llama model's tokenizer
+
 class Graph_GPT:
     r"""
     Container for a computational graph of a neural network.
@@ -1149,7 +1173,7 @@ class Graph_GPT:
                 299 if isinstance(model, torchvision.models.Inception3) else 224)
             self.expected_input_sz = sz if isinstance(sz, (tuple, list)) else (3, sz, sz)
             self.n_cells = self.model._n_cells if hasattr(self.model, '_n_cells') else 1
-            self._build_graph()   # automatically construct an initial computational graph
+            self._build_graph()  # automatically construct an initial computational graph
             self._add_virtual_edges(ve_cutoff=ve_cutoff)  # add virtual edges
             self._construct_features()  # initialize torch.Tensor node and edge features
             # self.visualize(figname='graph', figsize=(20, 20), with_labels=True, font_size=4)  # for debugging purposes
@@ -1329,7 +1353,10 @@ class Graph_GPT:
 
         self._Adj = A
         self._nodes = nodes
-        if self._reduce_graph:
+        ### check if the model is Llama
+        is_llama = self.model and isinstance(self.model, transformers.LlamaPreTrainedModel)
+        ### check if the model is Llama
+        if self._reduce_graph and not is_llama:
             A, nodes = self._filter_graph()  # Filter graph first time to remove most of the redundant/unsupported nodes
 
         if self._fix_weight_edges:
@@ -1351,10 +1378,11 @@ class Graph_GPT:
                 if node['param_name'].find(pattern) < 0:  # if no 'weight' string in the name, assume graph is correct
                     continue
 
+                #                 print(i, node['param_name'], A[:, i].sum(), len(np.where(A[:, i])[0]) == 0, A[i, :].sum())
                 for out_neigh in np.where(A[i, :])[0]:  # all nodes with an edge from the weight node, e.g. bias
 
                     is_same_layer = node['module'] == nodes[out_neigh]['module']
-                    qkv = len(np.where(A[:, i])[0]) == 0 and nodes[out_neigh]['param_name'].lower().find('softmax') >= 0
+                    qkv = nodes[out_neigh]['param_name'].lower().find('softmax') >= 0 or is_llama
                     if is_same_layer or qkv:
 
                         n_out = len(np.where(A[i, :])[0])  # number of out neighbors the weight node has
@@ -1374,6 +1402,9 @@ class Graph_GPT:
                             A[out_neigh, out_new] = 0  # remove the edges from the weight to out_new
                             A[i, out_new] = 1  # add edges from the bias to out_new
 
+        if self._reduce_graph and is_llama:
+            A, nodes = self._filter_graph()  # Filter graph first time to remove most of the redundant/unsupported nodes
+
         if self._fix_softmax_edges:
             # Fix softmax/msa edges to be consistent with the GHN/DeepNets-1M code
             pattern = 'softmax'
@@ -1381,48 +1412,88 @@ class Graph_GPT:
             for i, node in enumerate(nodes):
                 if node['param_name'].lower().find(pattern) < 0:
                     continue
-                for out_neigh in np.where(A[i, :])[0]:  # all nodes following i (msa/softmax), usually just one node
-                    in_out = np.setdiff1d(np.where(A[:, out_neigh])[0], i)  # nodes coming to out_neigh, except from i
-                    for j in in_out:
-                        # remove all edges coming to the node next to msa
-                        n_paths = 0
-                        for _ in nx.all_simple_paths(self.nx_graph, j, out_neigh):
-                            n_paths += 1
-                            if n_paths > 1:
-                                break
-                        # if n_paths == 1 and A[i, j] == 1, then do not change anything
-                        if n_paths > 1 or A[i, j] == 0:
-                            A[j, out_neigh] = 0  # For ViTs, there should be 2 paths, so remove the 2nd edge to softmax
-                        if n_paths == 1 and A[i, j] == 0:
-                            # if only one path from j to out_neigh, then the edge (j, i) will replace (j, out_neigh)
+                if is_llama:
+
+                    for in_neigh in np.where(A[:, i])[0]:
+
+                        #                         print(i, in_neigh, nodes[in_neigh]['param_name'])
+
+                        if nodes[in_neigh]['param_name'].lower().endswith('.weight'):
+                            A[in_neigh, i] = 0
+
+                    for out_neigh in np.where(A[i, :])[0]:  # all nodes following i (msa/softmax), usually just one node
+                        in_out = np.setdiff1d(np.where(A[:, out_neigh])[0],
+                                              i)  # nodes coming to out_neigh, except from i
+                        for j in in_out:
+                            A[j, :] = 0
                             A[j, i] = 1
+
+                else:
+                    for out_neigh in np.where(A[i, :])[0]:  # all nodes following i (msa/softmax), usually just one node
+                        in_out = np.setdiff1d(np.where(A[:, out_neigh])[0],
+                                              i)  # nodes coming to out_neigh, except from i
+                        for j in in_out:
+                            # remove all edges coming to the node next to msa
+                            n_paths = 0
+                            for _ in nx.all_simple_paths(self.nx_graph, j, out_neigh):
+                                n_paths += 1
+                                if n_paths > 1:
+                                    break
+                            # if n_paths == 1 and A[i, j] == 1, then do not change anything
+                            if n_paths > 1 or A[i, j] == 0:
+                                A[
+                                    j, out_neigh] = 0  # For ViTs, there should be 2 paths, so remove the 2nd edge to softmax
+                            if n_paths == 1 and A[i, j] == 0:
+                                # if only one path from j to out_neigh, then the edge (j, i) will replace (j, out_neigh)
+                                A[j, i] = 1
 
         if sum(A[np.diag_indices_from(A)]) > 0 and self._verbose:
             print('WARNING: diagonal elements of the adjacency matrix should be zero', sum(A[np.diag_indices_from(A)]))
 
-        if self.model is not None and isinstance(self.model, models.SwinTransformer):
-            # For SwinTransformer some edges do not match the code, so fixing them manually
-            for i, node in enumerate(nodes):
-                if node['param_name'].lower().endswith('norm.weight'):
-                    for out_neigh in np.where(A[i, :])[0]:
-                        if nodes[out_neigh]['param_name'].endswith('norm1.weight') or \
-                                nodes[out_neigh]['param_name'].find('Add') >= 0:
-                            A[i, out_neigh] = 0
-                            target_node = node['param_name'].replace('norm', 'reduction')
-                            for j, node2 in enumerate(nodes):
-                                if node2['param_name'].find(target_node) >= 0:
-                                    A[i, j] = 1
-                                    break
-                elif node['param_name'].lower().endswith('attn.proj.bias'):
-                    for out_neigh in np.where(A[i, :])[0]:
-                        if nodes[out_neigh]['param_name'].endswith('reduction.weight'):
-                            A[i, out_neigh] = 0  # from attn.bias to reduction.weight
-                            for out_neigh2 in np.where(A[out_neigh, :])[0]:
-                                if nodes[out_neigh2]['param_name'].startswith('AddBackward'):
-                                    A[i, out_neigh2] = 1  # from attn.bias to reduction.weight
+        if self.model:
+            if isinstance(self.model, models.SwinTransformer):
+                # For SwinTransformer some edges do not match the code, so fixing them manually
+                for i, node in enumerate(nodes):
+                    if node['param_name'].lower().endswith('norm.weight'):
+                        for out_neigh in np.where(A[i, :])[0]:
+                            if nodes[out_neigh]['param_name'].endswith('norm1.weight') or \
+                                    nodes[out_neigh]['param_name'].find('Add') >= 0:
+                                A[i, out_neigh] = 0
+                                target_node = node['param_name'].replace('norm', 'reduction')
+                                for j, node2 in enumerate(nodes):
+                                    if node2['param_name'].find(target_node) >= 0:
+                                        A[i, j] = 1
+                                        break
+                    elif node['param_name'].lower().endswith('attn.proj.bias'):
+                        for out_neigh in np.where(A[i, :])[0]:
+                            if nodes[out_neigh]['param_name'].endswith('reduction.weight'):
+                                A[i, out_neigh] = 0  # from attn.bias to reduction.weight
+                                for out_neigh2 in np.where(A[out_neigh, :])[0]:
+                                    if nodes[out_neigh2]['param_name'].startswith('AddBackward'):
+                                        A[i, out_neigh2] = 1  # from attn.bias to reduction.weight
+            elif is_llama:
+
+                for i, node in enumerate(nodes):
+                    if node['param_name'].lower().endswith('embed_tokens.weight'):
+                        #                         print(i, node['param_name'])
+                        # replace it with the res layer to be consistent with GHN3 graphs,
+                        # since lm_head is tied to this weight, so embed_tokens is redundant
+                        nodes[i] = {'id': 'res1', 'param_name': 'AddBackward0', 'attrs': None, 'module': None}
+                        for j, node_j in enumerate(nodes):
+                            if node_j['param_name'].lower().endswith('lm_head.weight'):
+                                A[:, j] = 0
+                                A[j, i] = 1
+                                for out_neigh in np.where(A[i, :])[0]:
+                                    if nodes[out_neigh]['param_name'].lower().endswith(
+                                            'layers.0.input_layernorm.weight'):
+                                        A[i, out_neigh] = 0
+                                        A[j, out_neigh] = 1
+
+                self._nodes = nodes
+                self._Adj = A
 
         if self._reduce_graph:
-            # Filter the graph one more time, since above manipulations could lead to redundant add/concat nodes
+            #             Filter the graph one more time, since above manipulations could lead to redundant add/concat nodes
             A, nodes = self._filter_graph(unsupported_modules=['Add', 'Cat'])
 
         # Add input node
@@ -1496,25 +1567,37 @@ class Graph_GPT:
 
                 else:
                     for module_name_type in MODULES:
+
                         if not isinstance(module_name_type, str) and isinstance(node['module'], module_name_type):
                             supported = True
                             break
                 if not supported and op_name not in MODULES:
+                    #                     print('not supported', op_name)
                     unsupported_modules.add(node['param_name'])
 
             # Add ops requiring extra checks (in the loop below) before removing
             # Staring with 'Mul' to identify CSE nodes (ops like sigmoid/swish need to be in the graph)
-            unsupported_modules = ['Mul'] + list(unsupported_modules) + ['Mean', 'Add', 'Cat']
+
+            unsupported_modules = ['Mul'] + list(unsupported_modules)
+            unsupported_modules = unsupported_modules + ['Mean', 'Add', 'Cat']
 
         has_sigmoid_swish_cse = False  # this flag is later used to decide if add a CSE operation or not
+        has_rms = False
+        has_gate_proj = False
         n_incoming = []  # number of incoming edges for each node
         for i, node in enumerate(self._nodes):
             n_incoming.append(len(np.where(self._Adj[:, i])[0]))
-            if not has_sigmoid_swish_cse:
+            if not has_sigmoid_swish_cse or not has_rms or not has_gate_proj:
                 op_name = node['param_name'].lower()
+                #                 print(node)
                 if op_name.find('sigmoid') >= 0 or op_name.find('swish') >= 0:
                     # Here we make a (quite weak) assumption that networks with the sigmoid/swish ops have CSE nodes
                     has_sigmoid_swish_cse = True
+                elif op_name.find('mlp.gate_proj') >= 0:
+                    has_gate_proj = True
+                elif ('module' in node and node['module'] is not None and
+                      isinstance(node['module'], transformers.models.llama.modeling_llama.LlamaRMSNorm)):
+                    has_rms = True
 
         # Loop over all unsupported_modules and all nodes
         for module_name in unsupported_modules:
@@ -1532,27 +1615,46 @@ class Graph_GPT:
                     try:
                         neighbors = dict([(j, self._nodes[i + j]['param_name'].lower()) for j in [-1, -2, -3, 1]])
                         # Check that this node belongs to the classification head by assuming a certain order of nodes
-                        classifier_head = np.any([neighbors[j].startswith(('classifier', 'fc', 'head')) for j in [-1, -2]])
+                        classifier_head = np.any(
+                            [neighbors[j].startswith(('classifier', 'fc', 'head')) for j in [-1, -2]])
                     except Exception as e:
                         # print(e, i, len(self._nodes), op_name)
                         classifier_head = True  # tricky case (set to True for now)
 
                     if op_name.startswith('Mean'):
+                        #                         print(op_name, has_sigmoid_swish_cse, classifier_head)
                         if has_sigmoid_swish_cse:
                             # Do not add the Mean op in CSE unless it's the last global pooling/classification head
                             keep = classifier_head
+                        elif has_rms:
+                            keep = False
 
                     elif op_name.startswith('Mul'):
                         # If below is True, then this Mul op is assumed to be the CSE op
                         # Otherwise, it is some other Mul op that we do not need to add to the graph
                         # This code is very error-prone and needs to be improved
-                        keep = has_sigmoid_swish_cse and \
-                               not classifier_head and \
-                               (neighbors[-2].startswith(('hard', 'sigmoid')) or
-                                neighbors[-3].startswith(('relu', 'mean')) or
-                                neighbors[1].startswith(('hard', 'sigmoid', 'relu')))
+                        if has_gate_proj:
+                            #                             print(op_name, neighbors[-1], neighbors[-2], neighbors[1])
+                            # MulBackward0 reshapealiasbackward0 model.layers.0.mlp.down_proj.weight silubackward0
+                            keep = neighbors[1].startswith('silu') and neighbors[-2].endswith('down_proj.weight')
+                        else:
+                            keep = has_sigmoid_swish_cse and \
+                                   not classifier_head and \
+                                   (neighbors[-2].startswith(('hard', 'sigmoid')) or
+                                    neighbors[-3].startswith(('relu', 'mean')) or
+                                    neighbors[1].startswith(('hard', 'sigmoid', 'relu')))
                     elif op_name.startswith(('Cat', 'Add')):  # Concat and Residual (Sum) ops
-                        keep = n_incoming[i] > 1  # keep only if > 1 edges are incoming, otherwise the node is redundant
+                        if has_gate_proj:
+                            keep = op_name.startswith('Add') and n_incoming[i] > 1 and not (
+                                    neighbors[-1].lower().startswith(('neg', 'softmax')) or
+                                    neighbors[-2].lower().startswith(('neg', 'softmax')) or
+                                    neighbors[1].lower().startswith(('neg', 'softmax')))
+                        #                             print(op_name, neighbors[-1], neighbors[-2], neighbors[1], keep)
+                        # AddBackward0 addbackward0 softmaxbackward0 model.layers.0.self_attn.q_proj.weight True
+
+                        else:
+                            keep = n_incoming[
+                                       i] > 1  # keep only if > 1 edges are incoming, otherwise the node is redundant
                     else:
                         keep = False
 
@@ -1830,7 +1932,7 @@ class Graph_GPT:
         self._nx_graph_from_adj(remove_ve=remove_ve)
 
         # first are conv layers, so that they have a similar color
-        primitives_ord = [2, 3, 4, 10, 5, 6, 11, 12, 13, 0, 1, 14, 7, 8, 9]
+        primitives_ord = [2, 3, 4, 10, 5, 6, 11, 12, 13, 0, 1, 14, 7, 8, 9, 15, 16, 17]
         assert len(PRIMITIVES_DEEPNETS1M) == len(primitives_ord), 'make sure the lists correspond to each other'
 
         n_primitives = len(primitives_ord)
@@ -1840,17 +1942,23 @@ class Graph_GPT:
         primitive_colors['bias'] = '#%02x%02x%02x' % (255, 0, 255)
         primitive_colors['msa'] = '#%02x%02x%02x' % (10, 10, 10)
         primitive_colors['ln'] = '#%02x%02x%02x' % (255, 255, 0)
+        primitive_colors['rmsnorm'] = '#%02x%02x%02x' % (100, 255, 0)
+        primitive_colors['rot_emb'] = '#%02x%02x%02x' % (0, 255, 0)
+        primitive_colors['gate'] = '#%02x%02x%02x' % (80, 50, 50)
 
-        node_groups = {'bn':        {'style': {'edgecolors': 'k',       'linewidths': 1,    'node_shape': 's'}},
-                       'conv1':     {'style': {'edgecolors': 'k',       'linewidths': 1,    'node_shape': '^'}},
-                       'bias':      {'style': {'edgecolors': 'gray',    'linewidths': 0.5,  'node_shape': 'd'}},
-                       'pos_enc':   {'style': {'edgecolors': 'gray',    'linewidths': 0.5,  'node_shape': 's'}},
-                       'ln':        {'style': {'edgecolors': 'gray',    'linewidths': 0.5,  'node_shape': 's'}},
-                       'max_pool':  {'style': {'edgecolors': 'k',       'linewidths': 1,    'node_shape': 'o'}},
-                       'glob_avg':  {'style': {'edgecolors': 'gray',    'linewidths': 0.5,  'node_shape': 'o'}},
-                       'concat':    {'style': {'edgecolors': 'gray',    'linewidths': 0.5,  'node_shape': '^'}},
-                       'input':     {'style': {'edgecolors': 'k',       'linewidths': 1.5,  'node_shape': 's'}},
-                       'other':     {'style': {'edgecolors': 'gray',    'linewidths': 0.5,  'node_shape': 'o'}}}
+        node_groups = {'bn': {'style': {'edgecolors': 'k', 'linewidths': 1, 'node_shape': 's'}},
+                       'conv1': {'style': {'edgecolors': 'k', 'linewidths': 1, 'node_shape': '^'}},
+                       'bias': {'style': {'edgecolors': 'gray', 'linewidths': 0.5, 'node_shape': 'd'}},
+                       'pos_enc': {'style': {'edgecolors': 'gray', 'linewidths': 0.5, 'node_shape': 's'}},
+                       'rot_emb': {'style': {'edgecolors': 'gray', 'linewidths': 0.5, 'node_shape': 's'}},
+                       'gate': {'style': {'edgecolors': 'k', 'linewidths': 1.5, 'node_shape': 's'}},
+                       'ln': {'style': {'edgecolors': 'gray', 'linewidths': 0.5, 'node_shape': 's'}},
+                       'rmsnorm': {'style': {'edgecolors': 'k', 'linewidths': 1, 'node_shape': 's'}},
+                       'max_pool': {'style': {'edgecolors': 'k', 'linewidths': 1, 'node_shape': 'o'}},
+                       'glob_avg': {'style': {'edgecolors': 'gray', 'linewidths': 0.5, 'node_shape': 'o'}},
+                       'concat': {'style': {'edgecolors': 'gray', 'linewidths': 0.5, 'node_shape': '^'}},
+                       'input': {'style': {'edgecolors': 'k', 'linewidths': 1.5, 'node_shape': 's'}},
+                       'other': {'style': {'edgecolors': 'gray', 'linewidths': 0.5, 'node_shape': 'o'}}}
         for group in ['glob_avg', 'input', 'max_pool']:
             node_groups[group]['node_size'] = (1.75 if group == 'max_pool' else 2) * node_size
 
@@ -1891,7 +1999,7 @@ class Graph_GPT:
         if vis_legend:
             fig = plt.figure(figsize=(20, 3) if figsize is None else figsize)
             G = nx.DiGraph(np.diag(np.ones(n_primitives), 1))
-            pos = {j: (3 * j * node_size, 0) for j in labels }
+            pos = {j: (3 * j * node_size, 0) for j in labels}
             pos_labels = {j: (x, y - label_offset) for j, (x, y) in pos.items()}
         else:
             fig = plt.figure(figsize=(10, 10) if figsize is None else figsize)
@@ -1926,6 +2034,13 @@ class Graph_GPT:
             plt.show()
 
 
+def get_conv_name(module, op_name):
+    if op_name.find('bias') >= 0:
+        return 'bias'
+    elif isinstance(module, nn.Conv2d) and module.groups > 1:
+        return 'dil_conv' if min(module.dilation) > 1 else 'sep_conv'
+    return 'conv'
+
 
 def get_conv_name(module, op_name):
     if op_name.find('bias') >= 0:
@@ -1937,38 +2052,42 @@ def get_conv_name(module, op_name):
 
 # Supported modules/layers
 MODULES = {
-            nn.Conv2d: get_conv_name,
-            nn.Linear: get_conv_name,  # considered equal to conv1x1
-            nn.modules.linear.NonDynamicallyQuantizableLinear: get_conv_name,  # linear layer in PyTorch ViT
-            nn.modules.activation.MultiheadAttention: get_conv_name,  # linear layer in PyTorch ViT
-            transformers.pytorch_utils.Conv1D: get_conv_name,  # for huggingface layers
-            nn.BatchNorm2d: lambda module, op_name: 'bn',
-            nn.LayerNorm: lambda module, op_name: 'ln',
-            models.convnext.LayerNorm2d: lambda module, op_name: 'ln',  # using a separate op (e.g. ln2) could be better
-            # We use pos_enc to denote any kind of embedding, which is not the best option
-            # Consider adding separate node types (e.g. 'embed') to differentiate between embedding layers
-            PosEnc: lambda module, op_name: 'pos_enc',
-            ppuda_ops.PosEnc: lambda module, op_name: 'pos_enc',
-            nn.modules.sparse.Embedding: lambda module, op_name: 'pos_enc',
-            models.vision_transformer.Encoder: lambda module, op_name: 'pos_enc',  # positional encoding in PyTorch ViTs
-            'input': 'input',
-            'Mean': 'glob_avg',
-            'AdaptiveAvgPool2D': 'glob_avg',
-            'MaxPool2DWithIndices': 'max_pool',
-            'AvgPool2D': 'avg_pool',
-            'Softmax': 'msa',  # multi-head self-attention
-            'Mul': 'cse',  # ChannelSELayer
-            'Add': 'sum',
-            'Cat': 'concat',
-            'skip_connect': 'sum',  # used to display redundant nodes when reduce_graph=False
+    nn.Conv2d: get_conv_name,
+    nn.Linear: get_conv_name,  # considered equal to conv1x1
+    nn.modules.linear.NonDynamicallyQuantizableLinear: get_conv_name,  # linear layer in PyTorch ViT
+    nn.modules.activation.MultiheadAttention: get_conv_name,  # linear layer in PyTorch ViT
+    transformers.pytorch_utils.Conv1D: get_conv_name,  # for huggingface layers
+    nn.BatchNorm2d: lambda module, op_name: 'bn',
+    nn.LayerNorm: lambda module, op_name: 'ln',
+    models.convnext.LayerNorm2d: lambda module, op_name: 'ln',  # using a separate op (e.g. ln2) could be better
+    transformers.models.llama.modeling_llama.LlamaRMSNorm: lambda module, op_name: 'rmsnorm',
+    # We use pos_enc to denote any kind of embedding, which is not the best option
+    # Consider adding separate node types (e.g. 'embed') to differentiate between embedding layers
+    PosEnc: lambda module, op_name: 'pos_enc',
+    ppuda_ops.PosEnc: lambda module, op_name: 'pos_enc',
+    nn.modules.sparse.Embedding: lambda module, op_name: 'pos_enc',
+    models.vision_transformer.Encoder: lambda module, op_name: 'pos_enc',  # positional encoding in PyTorch ViTs
+    # transformers.models.llama.modeling_llama.LlamaRotaryEmbedding: lambda module, op_name: 'pos_enc',
+    #             'Silu': 'gate',
+    'Neg': 'rot_emb',
+    'input': 'input',
+    'Mean': 'glob_avg',
+    'AdaptiveAvgPool2D': 'glob_avg',
+    'MaxPool2DWithIndices': 'max_pool',
+    'AvgPool2D': 'avg_pool',
+    'Softmax': 'msa',  # multi-head self-attention
+    'Mul': 'gate',  # ChannelSELayer
+    'Add': 'sum',
+    'Cat': 'concat',
+    'skip_connect': 'sum',  # used to display redundant nodes when reduce_graph=False
 
-            # Adding non-linearities and other layers to the graph is possible as shown below,
-            #  but requires adding them in ppuda.deepnets1m.genotypes.PRIMITIVES_DEEPNETS1M:
-            # torchvision.models.swin_transformer.ShiftedWindowAttention: lambda module, op_name: 'pos_enc',
-            # torchvision.models.convnext.CNBlock: lambda module, op_name: 'layer_scale',
-            # 'Gelu': 'gelu',
-            # 'Relu': 'relu',
+    # Adding non-linearities and other layers to the graph is possible as shown below,
+    #  but requires adding them in ppuda.deepnets1m.genotypes.PRIMITIVES_DEEPNETS1M:
+    # torchvision.models.swin_transformer.ShiftedWindowAttention: lambda module, op_name: 'pos_enc',
+    # torchvision.models.convnext.CNBlock: lambda module, op_name: 'layer_scale',
+    # 'Gelu': 'gelu',
+    # 'Relu': 'relu',
 
-            # Sometimes, existing primitives can be re-used for new operations as we do for
-            # models.convnext.LayerNorm2d, however this may be suboptimal compared to introducing a separate op
+    # Sometimes, existing primitives can be re-used for new operations as we do for
+    # models.convnext.LayerNorm2d, however this may be suboptimal compared to introducing a separate op
 }
