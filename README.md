@@ -2,7 +2,7 @@
 This is for the paper [**LoGAH: Predicting 774-Million-Parameter Transformers using Graph HyperNetworks with $\frac{1}{100}$ Parameters**](https://arxiv.org/abs/2405.16287).
 
 ## Requirements
-Please git clone [Parameter Prediction for Unseen Deep Architectures](https://github.com/facebookresearch/ppuda/tree/main) first and prepare the running environments, then git clone this repo under that folder. We also provided the `env.yml` for your convenient.
+Please git clone [Parameter Prediction for Unseen Deep Architectures](https://github.com/facebookresearch/ppuda/tree/main) first and prepare the running environments, then git clone this repo under that folder. We also provided the `env.yml` for your convenient, so that you can create the conda environment.
 
 
 ## Dataset Generator
