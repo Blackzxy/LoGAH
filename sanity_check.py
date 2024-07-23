@@ -35,7 +35,9 @@ LoGAH = GHN3_GPT(
     lora_r=32,
     max_ck_lora=int(16 * 2048),
     use_1d_decoder=False,
-)
+).to(device)
+LoGAH.eval()
+
 
 graph = Graph_GPT(model, ve_cutoff=250, dense=True,)
 model = LoGAH(
