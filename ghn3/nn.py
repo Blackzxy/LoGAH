@@ -27,7 +27,7 @@ from ppuda.ghn.nn import GHN, ConvDecoder
 from ppuda.ghn.mlp import MLP
 from ppuda.utils import capacity
 from ppuda.deepnets1m.net import named_layered_modules
-from .graph import Graph_GPT, GraphBatch, Graph
+from .graph import Graph_GPT, GraphBatch, Graph, PRIMITIVES_DEEPNETS1M
 from .utils import log
 from .ops import TransformerLayer as GraphormerLayer
 
@@ -176,6 +176,8 @@ class GHN3(GHN):
 
         act_layer = kwargs.pop('act_layer', nn.GELU)
         super().__init__(max_shape, num_classes, hid=hid, **kwargs)
+
+        self.embed = torch.nn.Embedding(len(PRIMITIVES_DEEPNETS1M), hid)
 
         self._is_ghn2 = is_ghn2
         if not self._is_ghn2:
@@ -735,7 +737,8 @@ class GHN3(GHN):
                             params_map[param_ind + node_ind] = ({'sz': sz}, None, None)
 
                         if sanity_check:
-                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse']:
+                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse',
+                                            'rot_emb', 'gate']:
                                 good = name.find(pattern) >= 0
                                 if good:
                                     break
@@ -840,6 +843,8 @@ class GHN3_GPT(GHN):
 
         act_layer = kwargs.pop('act_layer', nn.GELU)
         super().__init__(max_shape, num_classes, hid=hid, **kwargs)
+
+        self.embed = torch.nn.Embedding(len(PRIMITIVES_DEEPNETS1M), hid)
 
         self._is_ghn2 = is_ghn2
         if not self._is_ghn2:
@@ -1408,7 +1413,8 @@ class GHN3_GPT(GHN):
                             params_map[param_ind + node_ind] = ({'sz': sz}, None, None)
 
                         if sanity_check:
-                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse']:
+                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse',
+                                            'rot_emb', 'gate']:
                                 good = name.find(pattern) >= 0
                                 if good:
                                     break
@@ -1600,7 +1606,9 @@ class LLMShapeEncoder(nn.Module):
         self.debug_level = debug_level
         self.num_classes = num_classes
         self.ch_steps = (2**3, 2**6, 2**12, 2**13)
-        self.channels = np.unique([1, 3, num_classes, 50257, 50304] +
+        self.channels = np.unique([1, 3, num_classes, 50257, 50304,
+                                   32000, ## for llama
+                                   ] +
                                   list(range(self.ch_steps[0], self.ch_steps[1], 2**3)) +
                                   list(range(self.ch_steps[1], self.ch_steps[2], 2**4)) +
                                   list(range(self.ch_steps[2], self.ch_steps[3] + 1, 2**5)))
