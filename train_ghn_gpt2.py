@@ -167,7 +167,7 @@ def main():
     hid = args.hid
     s = 16
     ### You can change the max_shape here
-    dmax_shape = 2048
+    dmax_shape = 8192
 
     #default_max_shape = (hid * 2, hid * 2, s, s) if ghn2 else (hid, hid, s, s)
     default_max_shape = (dmax_shape, dmax_shape, s, s) if ghn2 else (dmax_shape, dmax_shape, s, s)
@@ -231,7 +231,7 @@ def main():
 
     cnt = 0
     for epoch in range(trainer.start_epoch, args.epochs):
-        if cnt>=1:
+        if cnt>=100:
             break
         cnt+=1
 
