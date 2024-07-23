@@ -1127,6 +1127,10 @@ class Graph:
 tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7B-hf")
 ### Specify Llama model's tokenizer
 
+### If for GPT-2
+# tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+### If for GPT-2
+
 class Graph_GPT:
     r"""
     Container for a computational graph of a neural network.
