@@ -39,9 +39,9 @@ LoGAH = GHN3_GPT(
 LoGAH.eval()
 
 
-graph = Graph_GPT(model, ve_cutoff=250, dense=True,)
+graph = Graph_GPT(model, ve_cutoff=250, dense=True)
 model = LoGAH(
     model.to(device),
-    GraphBatch([graph], dense=True).to_device(device),
+    GraphBatch([graph], dense=True).to_device(device)
 )
 
