@@ -450,27 +450,27 @@ def main():
             low_cpu_mem_usage=model_args.low_cpu_mem_usage,
         )
     else:
-        # print("***** LOAD from CHECKPOINT *****")
-        # model = GPT2LMHeadModel(config)
-        # model.load_state_dict(torch.load('checkpoints/WT2-lora-r32-hid64/gpt2_medium_epoch300_LoRAinit.pt')['state_dict'])
-        # print("***** LOAD from CHECKPOINT Done *****")
-        # for pn, p in model.named_parameters():
-        #     if pn.endswith("c_proj.weight"):
-        #         torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
-
-        model = AutoModelForCausalLM.from_config(config, trust_remote_code=model_args.trust_remote_code)
-        ### init all weights across all modules
-        for modules in model.modules():
-            if isinstance(modules, nn.Linear):
-                nn.init.normal_(modules.weight, mean=0.0, std=0.02)
-            if isinstance(modules, nn.Linear) and modules.bias is not None:
-                nn.init.zero_(modules.bias)
-            if isinstance(modules, nn.Embedding):
-                nn.init.normal_(modules.weight, mean=0.0, std=0.02)
-
+        print("***** LOAD from CHECKPOINT *****")
+        model = GPT2LMHeadModel(config)
+        model.load_state_dict(torch.load('checkpoints/WT2-lora-r32-hid64/gpt2_medium_epoch300_LoRAinit.pt')['state_dict'])
+        print("***** LOAD from CHECKPOINT Done *****")
         for pn, p in model.named_parameters():
             if pn.endswith("c_proj.weight"):
-                torch.nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
+                torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * config.n_layer))
+
+        # model = AutoModelForCausalLM.from_config(config, trust_remote_code=model_args.trust_remote_code)
+        # ### init all weights across all modules
+        # for modules in model.modules():
+        #     if isinstance(modules, nn.Linear):
+        #         nn.init.normal_(modules.weight, mean=0.0, std=0.02)
+        #     if isinstance(modules, nn.Linear) and modules.bias is not None:
+        #         nn.init.zero_(modules.bias)
+        #     if isinstance(modules, nn.Embedding):
+        #         nn.init.normal_(modules.weight, mean=0.0, std=0.02)
+
+        # for pn, p in model.named_parameters():
+        #     if pn.endswith("c_proj.weight"):
+        #         torch.nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * config.n_layer))
 
         n_params = sum({p.data_ptr(): p.numel() for p in model.parameters()}.values())
         logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")

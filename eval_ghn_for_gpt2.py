@@ -113,9 +113,9 @@ for m_ind, m in enumerate(models_queue):
             
             # kw_args = {'init_weights': False} if m in ['googlenet', 'inception_v3'] else {}
             # model = eval(f'models.{m}(num_classes=num_classes, **kw_args)').to(args.device)
-            n_embd = 768
-            n_layer = 12
-            n_head = 12
+            n_embd = 1280
+            n_layer = 36
+            n_head = 20
             
             config = GPT2Config(
                 bos_token_id=tokenizer.bos_token_id,
