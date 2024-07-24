@@ -452,7 +452,7 @@ def main():
     else:
         print("***** LOAD from CHECKPOINT *****")
         model = GPT2LMHeadModel(config)
-        model.load_state_dict(torch.load('checkpoints/WT2-lora-r32-hid64/gpt2_medium_epoch300_LoRAinit.pt')['state_dict'])
+        model.load_state_dict(torch.load('checkpoints/WT2-lora-r32-hid64/gpt2_large_epoch300_LoRAinit.pt')['state_dict'])
         print("***** LOAD from CHECKPOINT Done *****")
         for pn, p in model.named_parameters():
             if pn.endswith("c_proj.weight"):
