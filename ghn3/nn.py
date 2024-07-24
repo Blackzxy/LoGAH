@@ -22,6 +22,7 @@ import sys
 import time
 import hashlib
 import huggingface_hub
+import transformers
 from huggingface_hub import hf_hub_download
 from ppuda.ghn.nn import GHN, ConvDecoder
 from ppuda.ghn.mlp import MLP
@@ -1296,6 +1297,8 @@ class GHN3_GPT(GHN):
             key = 'in_proj_weight' if is_w else 'in_proj_bias'
         elif isinstance(module, torchvision.models.vision_transformer.Encoder):
             key = 'pos_embedding'
+        elif isinstance(module, transformers.models.llama.modeling_llama.LlamaRMSNorm):
+            key = 'weight'
         else:
             key = 'weight' if is_w else 'bias'
         target_param = getattr(module, key)
