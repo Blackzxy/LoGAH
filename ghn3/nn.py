@@ -21,15 +21,14 @@ import joblib
 import sys
 import time
 import hashlib
-import huggingface_hub
 import transformers
+import huggingface_hub
 from huggingface_hub import hf_hub_download
 from ppuda.ghn.nn import GHN, ConvDecoder
 from ppuda.ghn.mlp import MLP
-from ppuda.utils import capacity
 from ppuda.deepnets1m.net import named_layered_modules
-from .graph import Graph_GPT, GraphBatch, Graph, PRIMITIVES_DEEPNETS1M
-from .utils import log
+from .graph import Graph_LLM, GraphBatch, Graph, PRIMITIVES_DEEPNETS1M
+from .utils import log, capacity
 from .ops import TransformerLayer as GraphormerLayer
 
 print("######################## nn from LoGAH ########################")
@@ -135,11 +134,28 @@ def from_pretrained(ghn3_name='ghn3xlm16.pt', max_shape=128, **kwargs):
         for n, p in state_dict.items():
             if n.find('decoder.') >= 0 and p.dim() == 4:
                 state_dict[n] = p.squeeze()  # transforming 4D conv layer weights to 2D linear layer weights
-    try:
-        ghn.load_state_dict(state_dict)
-    except Exception:
-        log('failed to load {} with config {}'.format(ghn3_name, ghn_config))
-        raise
+    # try:
+    for n, p in state_dict.items():
+        if n == 'embed.weight':
+            if ghn.embed.weight.shape[0] > p.shape[0]:
+                print('WARNING: adding randomly initialized embeddings for {} to match the checkpoint shape!'.format(n))
+                p.data = torch.cat((p.data,
+                                    torch.normal(mean=0, std=0.02,
+                                                 size=(ghn.embed.weight.shape[0] - p.shape[0], p.shape[1]),
+                                                 device=p.device)))
+        elif n == 'shape_enc.embed_channel.weight':
+            if ghn.shape_enc.embed_channel.weight.shape[0] > p.shape[0]:
+                print('WARNING: adding randomly initialized embeddings for {} to match the checkpoint shape!'.format(n))
+                p.data = torch.cat((p.data,
+                                    torch.normal(mean=0, std=0.02,
+                                                 size=(ghn.shape_enc.embed_channel.weight.shape[0] - p.shape[0], p.shape[1]),
+                                                 device=p.device)))
+
+    res = ghn.load_state_dict(state_dict, strict=False)
+    print('load_state_dict', res, flush=True)
+    # except Exception:
+    #     log('failed to load {} with config {}'.format(ghn3_name, ghn_config))
+    #     raise
 
     if verbose:
         log('loading %s with %d parameters is done!' % (ghn3_name,
@@ -177,8 +193,6 @@ class GHN3(GHN):
 
         act_layer = kwargs.pop('act_layer', nn.GELU)
         super().__init__(max_shape, num_classes, hid=hid, **kwargs)
-
-        self.embed = torch.nn.Embedding(len(PRIMITIVES_DEEPNETS1M), hid)
 
         self._is_ghn2 = is_ghn2
         if not self._is_ghn2:
@@ -738,8 +752,7 @@ class GHN3(GHN):
                             params_map[param_ind + node_ind] = ({'sz': sz}, None, None)
 
                         if sanity_check:
-                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse',
-                                            'rot_emb', 'gate']:
+                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse']:
                                 good = name.find(pattern) >= 0
                                 if good:
                                     break
@@ -935,7 +948,8 @@ class GHN3_GPT(GHN):
                 predict_class_layers=True,
                 bn_track_running_stats=True,
                 keep_grads=False,
-                reduce_graph=False):
+                reduce_graph=False,
+                tokenizer=None):
         r"""
         Predict parameters for a list of >=1 networks.
         :param nets_torch: one network or a list of networks, each is based on nn.Module.
@@ -961,10 +975,10 @@ class GHN3_GPT(GHN):
         #self.config_n_layer = nets_torch[0].config.n_layer ## for GPT
         self.config_n_layer = nets_torch[0].config.num_hidden_layers ## for Llama
         if graphs is None:
-            graphs = GraphBatch([Graph_GPT(net, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
+            graphs = GraphBatch([Graph_LLM(net, tokenizer, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
                                 dense=self.is_dense()).to_device(device)
-        elif isinstance(graphs, Graph_GPT) or isinstance(graphs, (list, tuple)):
-            graphs = GraphBatch([graphs] if isinstance(graphs, Graph_GPT) else graphs,
+        elif isinstance(graphs, Graph_LLM) or isinstance(graphs, (list, tuple)):
+            graphs = GraphBatch([graphs] if isinstance(graphs, Graph_LLM) else graphs,
                                 dense=self.is_dense()).to_device(device)
 
         if isinstance(graphs, GraphBatch):
@@ -1083,8 +1097,12 @@ class GHN3_GPT(GHN):
                                         len(key) == 2 and key[1] == 0), (type(m), key)
                     else:
                         w_ = w[w_ind]
-                
-                    sz_set = self._set_params(m, self._tile_params(w_, sz), is_w=is_w & ~it, keep_grads=keep_grads, param_name=param_name)
+
+                    # print(type(m), param_name, is_w & ~it)
+                    is_w_ = is_w & ~it
+                    if isinstance(m, transformers.models.llama.modeling_llama.LlamaRMSNorm) and not is_w_:
+                        continue
+                    sz_set = self._set_params(m, self._tile_params(w_, sz), is_w=is_w_, keep_grads=keep_grads, param_name=param_name)
                     if debug_info is not None:
                         debug_info['n_tensors_pred'] += 1
                         debug_info['n_params_pred'] += torch.prod(torch.tensor(sz_set))
@@ -1297,8 +1315,6 @@ class GHN3_GPT(GHN):
             key = 'in_proj_weight' if is_w else 'in_proj_bias'
         elif isinstance(module, torchvision.models.vision_transformer.Encoder):
             key = 'pos_embedding'
-        elif isinstance(module, transformers.models.llama.modeling_llama.LlamaRMSNorm):
-            key = 'weight'
         else:
             key = 'weight' if is_w else 'bias'
         target_param = getattr(module, key)
@@ -1361,7 +1377,7 @@ class GHN3_GPT(GHN):
             # p = p * (beta / (sz[0] * p[0, 0].numel())) ** 0.5
 
             # fan-in:
-            if param_name.endswith('c_proj.weight'):
+            if param_name.endswith(('.c_proj.weight', '.o_proj.weight')):
                 p = (p * (beta / p[0].numel()) ** 0.5) / math.sqrt(2 * self.config_n_layer)
             else:
                 p = p * (beta / p[0].numel()) ** 0.5
@@ -1416,8 +1432,7 @@ class GHN3_GPT(GHN):
                             params_map[param_ind + node_ind] = ({'sz': sz}, None, None)
 
                         if sanity_check:
-                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse',
-                                            'rot_emb', 'gate']:
+                            for pattern in ['input', 'sum', 'concat', 'pool', 'glob_avg', 'msa', 'cse']:
                                 good = name.find(pattern) >= 0
                                 if good:
                                     break
@@ -1517,7 +1532,7 @@ class ConvDecoder3LoRA(nn.Module):
                        hid=(*hid, r*2*r), # Changed to 2*r*r
                        activation='relu',
                        last_activation=None)
-        #self.l1 = nn.Linear(r,int(r))
+        self.l1 = nn.Linear(r,int(r))
         self.l2 = nn.Linear(int(r), ck)
         self.relu = nn.ReLU(inplace=True)
         
@@ -1609,9 +1624,7 @@ class LLMShapeEncoder(nn.Module):
         self.debug_level = debug_level
         self.num_classes = num_classes
         self.ch_steps = (2**3, 2**6, 2**12, 2**13)
-        self.channels = np.unique([1, 3, num_classes, 50257, 50304,
-                                   32000, ## for llama
-                                   ] +
+        self.channels = np.unique([1, 3, num_classes, 32000, 50257, 128256] +
                                   list(range(self.ch_steps[0], self.ch_steps[1], 2**3)) +
                                   list(range(self.ch_steps[1], self.ch_steps[2], 2**4)) +
                                   list(range(self.ch_steps[2], self.ch_steps[3] + 1, 2**5)))

@@ -19,7 +19,7 @@ from torch.utils.data.distributed import DistributedSampler
 from ppuda.utils import rand_choice
 from ppuda.deepnets1m.genotypes import from_dict, PRIMITIVES_DEEPNETS1M
 from ppuda.deepnets1m.loader import DeepNets1M, NetBatchSampler, MAX_NODES_BATCH
-from .graph import Graph_GPT, GraphBatch
+from .graph import Graph_LLM, GraphBatch
 from .utils import log
 from .ddp_utils import is_ddp
 from .ops import NetworkLight
@@ -263,7 +263,7 @@ class DeepNets1MDDP(DeepNets1M):
         A = torch.tensor(A, dtype=torch.long)
         A[A > self.virtual_edges] = 0
 
-        graph = Graph_GPT(node_feat=node_feat, node_info=node_info, A=A, dense=self.dense, net_args=net_args)
+        graph = Graph_LLM(node_feat=node_feat, node_info=node_info, A=A, dense=self.dense, net_args=net_args)
         graph._param_shapes = param_shapes
 
         return graph

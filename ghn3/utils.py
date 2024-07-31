@@ -140,3 +140,23 @@ def transforms_imagenet(noise=False, im_size=224, timm_aug=False):
     valid_transform = transforms.Compose(valid_transform)
 
     return train_transform, valid_transform
+
+
+def capacity(model, is_grad=True):
+    """
+    More accurate parameter counting taking into account tied parameters (as in language models).
+    :param model:
+    :param is_grad:
+    :return:
+    """
+    c, n = 0, 0
+    d = {}
+    for name, p in model.named_parameters():
+        if not is_grad or (is_grad and p.requires_grad):
+            d[p.data_ptr()] = p.numel()
+
+    for ptr in d:
+        c += 1
+        n += d[ptr]
+
+    return c, int(n)
