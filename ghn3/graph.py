@@ -1347,7 +1347,8 @@ class Graph_LLM:
                         hid = 768  # try to guess
                     var = self.model(inputs_embeds=torch.randn(1, 3, hid).to(device)).logits
                 else:
-                    var = self.model(**self.tokenizer("Hello, my dog is cute", return_tensors="pt")).logits
+                    var = self.model(**self.tokenizer("Hello, ", return_tensors="pt")).logits
+                    print("var: ", var)
 
             if not isinstance(var, (tuple, list, dict)):
                 var = [var]
