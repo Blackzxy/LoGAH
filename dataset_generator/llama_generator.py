@@ -12,10 +12,12 @@ from ghn3.graph import Graph_LLM, GraphBatch
 from ppuda.utils.utils import capacity, set_seed
 
 from transformers import AutoTokenizer, AutoConfig
-from transformers import GPT2Config, GPT2LMHeadModel, AutoTokenizer
+from transformers import LlamaConfig, LlamaForCausalLM
+from huggingface_hub import login
 
+hf_token = "XXXX"
 
-
+login(token=hf_token, add_to_git_credential=True)  # need to login to download some models like Llama
 
 #def main():
 try:
@@ -23,7 +25,7 @@ try:
     N = int(sys.argv[1])
     data_dir = sys.argv[2]
 except Exception as e:
-    print('\nExample of usage: python gpt2_generator.py 10000 ./data\n', e)
+    print('\nExample of usage: python llama_generator.py 1000 ./data\n', e)
     raise
 
 try:
@@ -43,13 +45,12 @@ if not os.path.exists(data_dir):
 set_seed(1)
 
 dset_name = 'wikitext-2'
-h5_file = join(data_dir, 'GPT21K_%s.pkl' % split)
+h5_file = join(data_dir, 'Llama1K_%s.pkl' % split)
 
 graphs = []
 params = []
-tokenizer = AutoTokenizer.from_pretrained("gpt2")
-tokenizer.pad_token = tokenizer.eos_token
-tokenizer.padding_side = "left"
+model_id = "meta-llama/Meta-Llama-3.1-8B"
+tokenizer = AutoTokenizer.from_pretrained(model_id)
 
 def get_var():
     
@@ -79,19 +80,17 @@ while len(graphs) < N:
     elif n_embd % 4 == 0:
         n_head = 4
     
-
-
-    config = GPT2Config(
-        bos_token_id=tokenizer.bos_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-        n_embd=int(n_embd),
-        n_layer=int(n_layer),
-        n_head=int(n_head),
-        tie_word_embeddings=False,
+    config = LlamaConfig(
+        hidden_size=n_embd,
+        intermediate_size=n_embd * 4,
+        num_hidden_layers=n_layer,
+        num_attention_heads=n_head,
+        num_key_value_heads=n_head,
     )
+
     net_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_head}
     print(net_args, flush=True)
-    model = GPT2LMHeadModel(config)
+    model = LlamaForCausalLM(config)
 
     
     
