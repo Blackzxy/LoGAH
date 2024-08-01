@@ -22,34 +22,12 @@ import transformers
 import torchvision
 import torchvision.models as models
 import torch.nn.functional as F
-from transformers import AutoModelForCausalLM, GPT2Config, AutoTokenizer
 import ppuda.deepnets1m.ops as ppuda_ops
 from .ops import Network, PosEnc
 from torch.nn.parallel.scatter_gather import Scatter as _scatter
 from ppuda.deepnets1m.net import get_cell_ind, named_layered_modules, Network as NetworkPPUDA
 from ppuda.deepnets1m.genotypes import PRIMITIVES_DEEPNETS1M
 
-
-PRIMITIVES_DEEPNETS1M = [
-    'max_pool',
-    'avg_pool',
-    'sep_conv',
-    'dil_conv',
-    'conv',
-    'msa',
-    'cse',
-    'sum',
-    'concat',
-    'input',
-    'bias',
-    'bn',
-    'ln',
-    'pos_enc',
-    'glob_avg',
-    'rmsnorm',
-    'rot_emb',
-    'gate',
-]
 
 import sys
 sys.setrecursionlimit(10000)  # for large models like efficientnet_v2_l
@@ -510,6 +488,7 @@ class Graph:
                 var = self.model.get_var()
             else:
                 var = self.model(torch.randn(2, *self.expected_input_sz, device=device))
+                #var = self.model(**tokenizer("Hello, my dog is cute", return_tensors="pt")).logits
 
             if not isinstance(var, (tuple, list, dict)):
                 var = [var]
@@ -1123,15 +1102,30 @@ class Graph:
         else:
             plt.show()
 
-### Specify Llama model's tokenizer
-tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7B-hf")
-### Specify Llama model's tokenizer
 
-### If for GPT-2
-# tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-### If for GPT-2
+PRIMITIVES_DEEPNETS1M = [
+    'max_pool',
+    'avg_pool',
+    'sep_conv',
+    'dil_conv',
+    'conv',
+    'msa',
+    'cse',
+    'sum',
+    'concat',
+    'input',
+    'bias',
+    'bn',
+    'ln',
+    'pos_enc',
+    'glob_avg',
+    'rmsnorm',
+    'rot_emb',
+    'gate',
+]
 
-class Graph_GPT:
+
+class Graph_LLM:
     r"""
     Container for a computational graph of a neural network.
 
@@ -1141,7 +1135,7 @@ class Graph_GPT:
 
     """
 
-    def __init__(self, model=None, node_feat=None, node_info=None, A=None, edges=None, net_args=None, net_idx=None,
+    def __init__(self, model=None, tokenizer=None, node_feat=None, node_info=None, A=None, edges=None, net_args=None, net_idx=None,
                  ve_cutoff=50, list_all_nodes=False, reduce_graph=True, fix_weight_edges=True, fix_softmax_edges=True,
                  dense=False, verbose=True):
         r"""
@@ -1164,6 +1158,10 @@ class Graph_GPT:
         assert node_feat is None or model is None, 'either model or other arguments must be specified'
 
         self.model = model
+        self.tokenizer = tokenizer
+        if tokenizer is None:
+            raise ValueError('without the tokenizer the graph may be incorrect when tie_word_embeddings=False')
+
         self._list_all_nodes = list_all_nodes  # True in case of dataset generation
         self._verbose = verbose
         self._reduce_graph = reduce_graph
@@ -1339,7 +1337,17 @@ class Graph_GPT:
                 # get_var() can be used for the models in which the input is not a 4d tensor (batch of images)
                 var = self.model.get_var()
             else:
-                var = self.model(**tokenizer("Hello, my dog is cute", return_tensors="pt")).logits
+                if self.tokenizer is None:
+                    print('WARNING: without the tokenizer the graph may be incorrect when tie_word_embeddings=False')
+                    if hasattr(self.model.config, 'n_embd'):
+                        hid = self.model.config.n_embd
+                    elif hasattr(self.model.config, 'hidden_size'):
+                        hid = self.model.config.hidden_size
+                    else:
+                        hid = 768  # try to guess
+                    var = self.model(inputs_embeds=torch.randn(1, 3, hid).to(device)).logits
+                else:
+                    var = self.model(**self.tokenizer("Hello, my dog is cute", return_tensors="pt")).logits
 
             if not isinstance(var, (tuple, list, dict)):
                 var = [var]
@@ -1357,9 +1365,7 @@ class Graph_GPT:
 
         self._Adj = A
         self._nodes = nodes
-        ### check if the model is Llama
         is_llama = self.model and isinstance(self.model, transformers.LlamaPreTrainedModel)
-        ### check if the model is Llama
         if self._reduce_graph and not is_llama:
             A, nodes = self._filter_graph()  # Filter graph first time to remove most of the redundant/unsupported nodes
 
@@ -1478,20 +1484,41 @@ class Graph_GPT:
             elif is_llama:
 
                 for i, node in enumerate(nodes):
-                    if node['param_name'].lower().endswith('embed_tokens.weight'):
-                        #                         print(i, node['param_name'])
-                        # replace it with the res layer to be consistent with GHN3 graphs,
-                        # since lm_head is tied to this weight, so embed_tokens is redundant
+
+                    if not self.model.config.tie_word_embeddings and node['param_name'].lower().endswith(
+                            'embed_tokens.weight'):
+                        nodes.append(nodes[i])
                         nodes[i] = {'id': 'res1', 'param_name': 'AddBackward0', 'attrs': None, 'module': None}
+                        A = np.pad(A, ((0, 1), (0, 1)), mode='constant')
+                        A[-1, i] = 1
+                        for out_neigh in np.where(A[i, :])[0]:
+                            if nodes[out_neigh]['param_name'].endswith('input_layernorm.weight'):
+                                A[i, out_neigh] = 0
+                                A[-1, out_neigh] = 1
+                        break
+                    elif self.model.config.tie_word_embeddings and node['param_name'].lower().endswith(
+                            'lm_head.weight'):
+                        A[:, i] = 0  # remove incoming edges to lm_head
                         for j, node_j in enumerate(nodes):
-                            if node_j['param_name'].lower().endswith('lm_head.weight'):
-                                A[:, j] = 0
-                                A[j, i] = 1
-                                for out_neigh in np.where(A[i, :])[0]:
-                                    if nodes[out_neigh]['param_name'].lower().endswith(
-                                            'layers.0.input_layernorm.weight'):
-                                        A[i, out_neigh] = 0
-                                        A[j, out_neigh] = 1
+                            if node_j['param_name'].lower().endswith('layers.0.self_attn.o_proj.weight'):
+                                in_neigh = np.where(A[:, j])[0]
+
+                                for out_neigh in np.where(A[j, :])[0]:
+                                    if nodes[out_neigh]['param_name'].endswith('input_layernorm.weight'):
+                                        A[j, out_neigh] = 0
+                                        break
+
+                                nodes.append(
+                                    {'id': 'res2', 'param_name': 'AddBackward0', 'attrs': None, 'module': None})
+                                A = np.pad(A, ((0, 1), (0, 1)), mode='constant')
+                                A[i, j] = 0
+                                A[i, -1] = 1
+                                for out_neigh in np.where(A[j, :])[0]:
+                                    A[-1, out_neigh] = 1
+                                A[j, :] = 0
+                                A[j, -1] = 1
+                                break
+                        break
 
                 self._nodes = nodes
                 self._Adj = A
@@ -2046,52 +2073,42 @@ def get_conv_name(module, op_name):
     return 'conv'
 
 
-def get_conv_name(module, op_name):
-    if op_name.find('bias') >= 0:
-        return 'bias'
-    elif isinstance(module, nn.Conv2d) and module.groups > 1:
-        return 'dil_conv' if min(module.dilation) > 1 else 'sep_conv'
-    return 'conv'
-
-
 # Supported modules/layers
 MODULES = {
-    nn.Conv2d: get_conv_name,
-    nn.Linear: get_conv_name,  # considered equal to conv1x1
-    nn.modules.linear.NonDynamicallyQuantizableLinear: get_conv_name,  # linear layer in PyTorch ViT
-    nn.modules.activation.MultiheadAttention: get_conv_name,  # linear layer in PyTorch ViT
-    transformers.pytorch_utils.Conv1D: get_conv_name,  # for huggingface layers
-    nn.BatchNorm2d: lambda module, op_name: 'bn',
-    nn.LayerNorm: lambda module, op_name: 'ln',
-    models.convnext.LayerNorm2d: lambda module, op_name: 'ln',  # using a separate op (e.g. ln2) could be better
-    transformers.models.llama.modeling_llama.LlamaRMSNorm: lambda module, op_name: 'rmsnorm',
-    # We use pos_enc to denote any kind of embedding, which is not the best option
-    # Consider adding separate node types (e.g. 'embed') to differentiate between embedding layers
-    PosEnc: lambda module, op_name: 'pos_enc',
-    ppuda_ops.PosEnc: lambda module, op_name: 'pos_enc',
-    nn.modules.sparse.Embedding: lambda module, op_name: 'pos_enc',
-    models.vision_transformer.Encoder: lambda module, op_name: 'pos_enc',  # positional encoding in PyTorch ViTs
-    # transformers.models.llama.modeling_llama.LlamaRotaryEmbedding: lambda module, op_name: 'pos_enc',
-    #             'Silu': 'gate',
-    'Neg': 'rot_emb',
-    'input': 'input',
-    'Mean': 'glob_avg',
-    'AdaptiveAvgPool2D': 'glob_avg',
-    'MaxPool2DWithIndices': 'max_pool',
-    'AvgPool2D': 'avg_pool',
-    'Softmax': 'msa',  # multi-head self-attention
-    'Mul': 'gate',  # ChannelSELayer
-    'Add': 'sum',
-    'Cat': 'concat',
-    'skip_connect': 'sum',  # used to display redundant nodes when reduce_graph=False
+            nn.Conv2d: get_conv_name,
+            nn.Linear: get_conv_name,  # considered equal to conv1x1
+            nn.modules.linear.NonDynamicallyQuantizableLinear: get_conv_name,  # linear layer in PyTorch ViT
+            nn.modules.activation.MultiheadAttention: get_conv_name,  # linear layer in PyTorch ViT
+            transformers.pytorch_utils.Conv1D: get_conv_name,  # for huggingface layers
+            nn.BatchNorm2d: lambda module, op_name: 'bn',
+            nn.LayerNorm: lambda module, op_name: 'ln',
+            models.convnext.LayerNorm2d: lambda module, op_name: 'ln',  # using a separate op (e.g. ln2) could be better
+            transformers.models.llama.modeling_llama.LlamaRMSNorm: lambda module, op_name: 'rmsnorm',
+            # We use pos_enc to denote any kind of embedding, which is not the best option
+            # Consider adding separate node types (e.g. 'embed') to differentiate between embedding layers
+            PosEnc: lambda module, op_name: 'pos_enc',
+            ppuda_ops.PosEnc: lambda module, op_name: 'pos_enc',
+            nn.modules.sparse.Embedding: lambda module, op_name: 'pos_enc',
+            models.vision_transformer.Encoder: lambda module, op_name: 'pos_enc',  # positional encoding in PyTorch ViTs
+            'Neg': 'rot_emb',  # LlamaRotaryEmbedding
+            'input': 'input',
+            'Mean': 'glob_avg',
+            'AdaptiveAvgPool2D': 'glob_avg',
+            'MaxPool2DWithIndices': 'max_pool',
+            'AvgPool2D': 'avg_pool',
+            'Softmax': 'msa',  # multi-head self-attention
+            'Mul': 'gate',  # ChannelSELayer
+            'Add': 'sum',
+            'Cat': 'concat',
+            'skip_connect': 'sum',  # used to display redundant nodes when reduce_graph=False
 
-    # Adding non-linearities and other layers to the graph is possible as shown below,
-    #  but requires adding them in ppuda.deepnets1m.genotypes.PRIMITIVES_DEEPNETS1M:
-    # torchvision.models.swin_transformer.ShiftedWindowAttention: lambda module, op_name: 'pos_enc',
-    # torchvision.models.convnext.CNBlock: lambda module, op_name: 'layer_scale',
-    # 'Gelu': 'gelu',
-    # 'Relu': 'relu',
+            # Adding non-linearities and other layers to the graph is possible as shown below,
+            #  but requires adding them in ppuda.deepnets1m.genotypes.PRIMITIVES_DEEPNETS1M:
+            # torchvision.models.swin_transformer.ShiftedWindowAttention: lambda module, op_name: 'pos_enc',
+            # torchvision.models.convnext.CNBlock: lambda module, op_name: 'layer_scale',
+            # 'Gelu': 'gelu',
+            # 'Relu': 'relu',
 
-    # Sometimes, existing primitives can be re-used for new operations as we do for
-    # models.convnext.LayerNorm2d, however this may be suboptimal compared to introducing a separate op
+            # Sometimes, existing primitives can be re-used for new operations as we do for
+            # models.convnext.LayerNorm2d, however this may be suboptimal compared to introducing a separate op
 }

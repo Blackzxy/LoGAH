@@ -346,7 +346,6 @@ class Trainer:
                                 n_layer=int(n_layer),
                                 n_head=int(n_head),
                                 tie_word_embeddings=False,
-                                #vocab_size=50304,
                             )
                             net = GPT2LMHeadModel(config)
                             net.config = config
