@@ -6,7 +6,7 @@ Please git clone [Parameter Prediction for Unseen Deep Architectures](https://gi
 
 
 ## Dataset Generator
-In `dataset_generator`, we provide the codes for generating ViTs-1K and GPTs-1K datasets. `gpt2_generator.py` and `vit_generator.py` is used for generating the dataset of GPTs-1K and ViTs-1K, respectively. Note that, when generating GPTs-1K datasets and training LoGAH on GPTs-1K, please modify the following code
+We provide the codes for generating ViTs-1K and GPTs-1K datasets. `gpt2_generator.py` and `vit_generator.py` is used for generating the dataset of GPTs-1K and ViTs-1K, respectively. Note that, when generating GPTs-1K datasets and training LoGAH on GPTs-1K, please modify the following code
 ```python
 var = self.model(torch.randn(2, *self.expected_input_sz, device=device))
 ```
@@ -18,7 +18,6 @@ in order to support language models. We provided the modified `graph.py` in `ghn
 
 > Note that: It could be a large file when generating the original datasets, one solution is to generate a similar dataset with smaller models sizes, and in the corresponding `trainer.py` you randomly generate the original size of model for training. Refer to the commented code in `trainer.py` for more details.
 
-> PS. If you encounter the module loading issue, please copy the `gpt2_generator.py` and `vit_generator.py` to the `LoGAH` folder, and run the code.
 
 
 ## LoGAH
