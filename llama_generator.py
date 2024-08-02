@@ -12,11 +12,9 @@ from ghn3.graph import Graph_LLM, GraphBatch
 from ppuda.utils.utils import capacity, set_seed
 
 from transformers import AutoTokenizer, AutoConfig
-from transformers import LlamaConfig, LlamaForCausalLM
+from transformers import LlamaConfig, LlamaForCausalLM, AutoModelForCausalLM
 from huggingface_hub import login
-
-hf_token = "XX"
-
+hf_token = "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"
 login(token=hf_token, add_to_git_credential=True)  # need to login to download some models like Llama
 
 #def main():
@@ -51,6 +49,8 @@ graphs = []
 params = []
 model_id = "meta-llama/Meta-Llama-3.1-8B"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
+config = AutoConfig.from_pretrained(model_id)
+
 
 def get_var():
     
@@ -59,10 +59,10 @@ def get_var():
 
 
 while len(graphs) < N:
-    n_layer = np.random.randint(3, 10)
-    n_layer = np.random.choice([3, 6])
-    n_embd = np.random.choice([768])
-    n_head = np.random.choice([2])
+    n_layer = np.random.randint(3, 4)
+    n_layer = np.random.choice([4])
+    n_embd = np.random.choice([120])
+    n_head = np.random.choice([8])
 
     # if n_layer > 5:
     #     dim_min = 72
@@ -83,17 +83,17 @@ while len(graphs) < N:
     # elif n_embd % 4 == 0:
     #     n_head = 4
     
-    config = LlamaConfig(
-        hidden_size=n_embd,
-        intermediate_size=n_embd * 4,
-        num_hidden_layers=n_layer,
-        num_attention_heads=n_head,
-        num_key_value_heads=n_head,
-    )
+    config.hidden_size = int(n_embd)
+    config.intermediate_size = int(n_embd * 4)
+    config.num_hidden_layers = int(n_layer)
+    config.num_attention_heads = int(n_head)
+    config.num_key_value_heads = int(n_head)
 
     net_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_head}
     print(net_args, flush=True)
-    model = LlamaForCausalLM(config)
+    print(config, flush=True)
+    #model = LlamaForCausalLM(config)
+    model = AutoModelForCausalLM.from_config(config)
 
     
     
@@ -111,8 +111,8 @@ while len(graphs) < N:
     graphs.append(graph)
     print(len(graphs), '%.3f M params' % (n / 1e6), flush=True)
 
-with open(h5_file, 'wb') as f:
-    pickle.dump(graphs, f)
+# with open(h5_file, 'wb') as f:
+#     pickle.dump(graphs, f)
 
 print('saved to %s' % h5_file)
 print('params: %.3f +- %.3f M' % (np.mean(params), np.std(params)), flush=True)
