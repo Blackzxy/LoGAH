@@ -14,7 +14,7 @@ from ppuda.utils.utils import capacity, set_seed
 from transformers import AutoTokenizer, AutoConfig
 from transformers import LlamaConfig, LlamaForCausalLM, AutoModelForCausalLM
 from huggingface_hub import login
-hf_token = "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"
+hf_token = "XX"
 login(token=hf_token, add_to_git_credential=True)  # need to login to download some models like Llama
 
 #def main():
