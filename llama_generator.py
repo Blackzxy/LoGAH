@@ -14,7 +14,7 @@ from ppuda.utils.utils import capacity, set_seed
 from transformers import AutoTokenizer, AutoConfig
 from transformers import LlamaConfig, LlamaForCausalLM, AutoModelForCausalLM
 from huggingface_hub import login
-hf_token = "XX"
+hf_token = "XXX"
 login(token=hf_token, add_to_git_credential=True)  # need to login to download some models like Llama
 
 #def main():
@@ -59,37 +59,34 @@ def get_var():
 
 
 while len(graphs) < N:
-    n_layer = np.random.randint(3, 4)
-    n_layer = np.random.choice([4])
-    n_embd = np.random.choice([120])
-    n_head = np.random.choice([8])
-
-    # if n_layer > 5:
-    #     dim_min = 72
-    #     dim_max = 176
-    # elif n_layer > 3:
-    #     dim_min = 128
-    #     dim_max = 176
-    # else:
-    #     dim_min = 176
-    #     dim_max = 256
-    
-    # n_embd = np.random.choice(np.arange(dim_min, dim_max+1, 8))
-
-    # if n_embd % 8 == 0:
-    #     n_head = np.random.choice([8])
-    # elif n_embd % 6 == 0:
-    #     n_head = np.random.choice([6])
-    # elif n_embd % 4 == 0:
-    #     n_head = 4
+    n_layer = np.random.randint(3, 10)
+    if n_layer > 5:
+        n_heads = np.random.choice([4])
+        ## make sure (n_embd/n_heads)%2 == 0
+        x_min = 2**4
+        x_max = 2**5
+        x_ = np.random.choice(np.arange(x_min, x_max+1, 2))
+        n_embd = x_ * n_heads
+    elif n_layer > 3:
+        n_heads = np.random.choice([6])
+        x_min = 2**4
+        x_max = 2**5
+        x_ = np.random.choice(np.arange(x_min, x_max+1, 2))
+        n_embd = x_ * n_heads
+    else:
+        n_heads = np.random.choice([8])
+        x_min = 2**3
+        x_max = 2**4
+        x_ = np.random.choice(np.arange(x_min, x_max+1, 2))
+        n_embd = x_ * n_heads
     
     config.hidden_size = int(n_embd)
     config.intermediate_size = int(n_embd * 4)
     config.num_hidden_layers = int(n_layer)
-    config.num_attention_heads = int(n_head)
-    config.num_key_value_heads = int(n_head)
+    config.num_attention_heads = int(n_heads)
+    config.num_key_value_heads = int(n_heads)
 
-    net_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_head}
+    net_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_heads}
     print(net_args, flush=True)
     print(config, flush=True)
     #model = LlamaForCausalLM(config)
@@ -106,7 +103,7 @@ while len(graphs) < N:
     
     params.append(n/1e6)
     graph = Graph_LLM(model, tokenizer, ve_cutoff=250, dense=True)
-    graph.net_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_head}
+    graph.net_args = {'n_embd': n_embd, 'n_layer': n_layer, 'n_head': n_heads}
     graph.config = config
     graphs.append(graph)
     print(len(graphs), '%.3f M params' % (n / 1e6), flush=True)
