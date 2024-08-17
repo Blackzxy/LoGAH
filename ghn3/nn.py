@@ -974,6 +974,7 @@ class GHN3_GPT(GHN):
 
         #self.config_n_layer = nets_torch[0].config.n_layer ## for GPT
         self.config_n_layer = nets_torch[0].config.num_hidden_layers ## for Llama
+
         if graphs is None:
             graphs = GraphBatch([Graph_LLM(net, tokenizer, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
                                 dense=self.is_dense()).to_device(device)
@@ -1377,10 +1378,14 @@ class GHN3_GPT(GHN):
             # p = p * (beta / (sz[0] * p[0, 0].numel())) ** 0.5
 
             # fan-in:
-            if param_name.endswith(('.c_proj.weight', '.o_proj.weight')):
-                p = (p * (beta / p[0].numel()) ** 0.5) / math.sqrt(2 * self.config_n_layer)
-            else:
-                p = p * (beta / p[0].numel()) ** 0.5
+            p = p * (beta / p[0].numel()) ** 0.5
+
+            # #### Specific in GPT-2 implementation
+            # if param_name.endswith(('.c_proj.weight', '.o_proj.weight')):
+            #     p = (p * (beta / p[0].numel()) ** 0.5) / math.sqrt(2 * self.config_n_layer)
+            # else:
+            #     p = p * (beta / p[0].numel()) ** 0.5
+
 
         else:
 

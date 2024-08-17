@@ -309,36 +309,31 @@ class Trainer:
                         graphs2 = []
                         for nets_args in graphs.net_args:
                         #for config in graphs.configs:
-                            # net = Network(is_imagenet_input=is_imagenet,
-                            #               num_classes=num_classes,
-                            #               **nets_args)
-
-                            ### random select hidden_dim from (128, 512) ###
+                           
                             n_layer = np.random.randint(3, 10)
-                            if n_layer > 5:
-                                n_heads = np.random.choice([4])
-                                ## make sure (n_embd/n_heads)%2 == 0
-                                x_min = 2**4
-                                x_max = 2**5
-                                x_ = np.random.choice(np.arange(x_min, x_max+1, 2))
-                                n_embd = x_ * n_heads
-                            elif n_layer > 3:
-                                n_heads = np.random.choice([6])
-                                x_min = 2**4
-                                x_max = 2**5
-                                x_ = np.random.choice(np.arange(x_min, x_max+1, 2))
-                                n_embd = x_ * n_heads
+                            if n_layer > 7:
+                                dim_min = 64
+                                dim_max = 128
+                            elif n_layer > 5:
+                                dim_min = 128
+                                dim_max = 192
                             else:
-                                n_heads = np.random.choice([8])
-                                x_min = 2**3
-                                x_max = 2**4
-                                x_ = np.random.choice(np.arange(x_min, x_max+1, 2))
-                                n_embd = x_ * n_heads
+                                dim_min = 176
+                                dim_max = 256
                             
+                            n_embd = np.random.choice(np.arange(dim_min, dim_max+1, 8))
 
-        
+                            if n_embd % 8 == 0 and (n_embd / 8) % 2 == 0:
+                                n_heads = 8
+                            elif n_embd % 6 == 0 and (n_embd / 6) % 2 == 0:
+                                n_heads = 6
+                            elif n_embd % 4 == 0 and (n_embd / 4) % 2 == 0:
+                                n_heads = 4
+                            else:
+                                n_heads = 2
                             
                             intermediate_size_ratio = np.random.choice([3.5, 4])
+                            n_key_value_heads = np.random.choice([1, 2, int(n_heads/2), n_heads])
 
                             # if n_layer > 5:
                             #     n_head = np.random.choice([2, 4])
@@ -359,7 +354,7 @@ class Trainer:
                             CONFIG.intermediate_size = int(n_embd * intermediate_size_ratio)
                             CONFIG.num_hidden_layers = int(n_layer)
                             CONFIG.num_attention_heads = int(n_heads)
-                            CONFIG.num_key_value_heads = int(n_heads)
+                            CONFIG.num_key_value_heads = int(n_key_value_heads)
                             # print(CONFIG)
 
                             net = AutoModelForCausalLM.from_config(CONFIG)

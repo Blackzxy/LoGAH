@@ -50,7 +50,7 @@ class GraphBatch:
         :param graphs: iterable, where each item is a Graph object.
         :param dense: create dense node and adjacency matrices (e.g. for transformer)
         """
-        self.n_nodes, self.node_feat, self.node_info, self.edges, self.net_args, self.net_inds = [], [], [], [], [], []
+        self.n_nodes, self.node_feat, self.node_info, self.edges, self.net_args, self.net_inds, self.configs = [], [], [], [], [], [], []
         self._n_edges = []
         self.graphs = graphs
         self.dense = dense
@@ -1348,7 +1348,8 @@ class Graph_LLM:
                     var = self.model(inputs_embeds=torch.randn(1, 3, hid).to(device)).logits
                 else:
                     var = self.model(**self.tokenizer("Hello, ", return_tensors="pt")).logits
-                    print("var: ", var)
+                    #print(var.shape)
+                   
 
             if not isinstance(var, (tuple, list, dict)):
                 var = [var]
