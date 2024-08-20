@@ -1,6 +1,8 @@
 # LoGAH
 This is for the paper [**LoGAH: Predicting 774-Million-Parameter Transformers using Graph HyperNetworks with $\frac{1}{100}$ Parameters**](https://arxiv.org/abs/2405.16287).
 
+We released the [LoGAH-Tiny-8K model](https://drive.google.com/file/d/1uEZIf7pZ_JR-d7cdxoQpdXzyrLg1qX69/view?usp=share_link) trained on WikiText-103 for 90 Epochs, which means it can support the prediction of models with max width up to 8K.
+
 ## Requirements
 Please git clone [Parameter Prediction for Unseen Deep Architectures](https://github.com/facebookresearch/ppuda/tree/main) first and prepare the running environments, then git clone this repo under that folder. We also provided the `env.yml` for your convenient, so that you can create the conda environment.
 
