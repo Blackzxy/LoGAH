@@ -56,14 +56,14 @@ config = AutoConfig.from_pretrained(args.split)
 
 if args.split.startswith('meta-llama'):
     # some config for a smaller model
-    n_embd = 768
-    n_layer = 2
-    n_head = 12
+    n_embd = 1024
+    n_layer = 12
+    n_head = 16
     config.hidden_size = n_embd
     config.intermediate_size = n_embd * 4
     config.num_hidden_layers = n_layer
     config.num_attention_heads = n_head
-    config.num_key_value_heads = n_head
+    config.num_key_value_heads = int(n_head/2)
     # config.tie_word_embeddings = True
 
 model = AutoModelForCausalLM.from_config(config)

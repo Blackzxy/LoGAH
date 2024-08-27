@@ -59,7 +59,7 @@ from ghn3.ddp_utils import setup_ddp, clean_ddp
 import time
 log = partial(log, flush=True)
 from huggingface_hub import login
-hf_token = "XXX"
+hf_token = "XX"
 login(token=hf_token, add_to_git_credential=True)  # need to login to download some models like Llama
 
 

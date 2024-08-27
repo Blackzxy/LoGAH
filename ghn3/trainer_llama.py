@@ -318,7 +318,7 @@ class Trainer:
                                 dim_min = 128
                                 dim_max = 192
                             else:
-                                dim_min = 176
+                                dim_min = 160
                                 dim_max = 256
                             
                             n_embd = np.random.choice(np.arange(dim_min, dim_max+1, 8))

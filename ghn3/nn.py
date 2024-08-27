@@ -974,6 +974,7 @@ class GHN3_GPT(GHN):
 
         #self.config_n_layer = nets_torch[0].config.n_layer ## for GPT
         self.config_n_layer = nets_torch[0].config.num_hidden_layers ## for Llama
+        self.config_initializer_range = nets_torch[0].config.initializer_range ## for Llama
 
         if graphs is None:
             graphs = GraphBatch([Graph_LLM(net, tokenizer, ve_cutoff=50 if self.ve else 1) for net in nets_torch],
@@ -1356,29 +1357,33 @@ class GHN3_GPT(GHN):
         :return: normalized predicted tensor
         """
         if p.dim() > 1:
-            if isinstance(module, nn.Embedding):
-                return p
+            p = (p / (p.std() + 1e-7)) * self.config_initializer_range
+            # return p
 
-            sz = p.shape
+            # if isinstance(module, nn.Embedding):
+            #     return p
 
-            if len(sz) > 2 and sz[2] >= 11 and sz[0] == 1:
-                if self.debug_level:
-                    assert module.__class__.__name__.lower().find('enc') >= 0, (sz, module, type(module))
-                return p  # do not normalize positional encoding weights
+            # sz = p.shape
 
-            no_relu = len(sz) > 2 and (sz[1] == 1 or sz[2] < sz[3])
-            if no_relu:
-                # layers not followed by relu
-                beta = 1.
-            else:
-                # for layers followed by rely increase the weight scale
-                beta = 2.
+            # if len(sz) > 2 and sz[2] >= 11 and sz[0] == 1:
+            #     if self.debug_level:
+            #         assert module.__class__.__name__.lower().find('enc') >= 0, (sz, module, type(module))
+            #     return p  # do not normalize positional encoding weights
+
+            # no_relu = len(sz) > 2 and (sz[1] == 1 or sz[2] < sz[3])
+            # if no_relu:
+            #     # layers not followed by relu
+            #     beta = 1.
+            # else:
+            #     # for layers followed by rely increase the weight scale
+            #     beta = 2.
 
             # fan-out:
             # p = p * (beta / (sz[0] * p[0, 0].numel())) ** 0.5
 
             # fan-in:
-            p = p * (beta / p[0].numel()) ** 0.5
+            # p = p * (beta / p[0].numel()) ** 0.5
+            
 
             # #### Specific in GPT-2 implementation
             # if param_name.endswith(('.c_proj.weight', '.o_proj.weight')):
