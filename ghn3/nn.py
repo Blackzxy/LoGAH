@@ -1358,31 +1358,31 @@ class GHN3_GPT(GHN):
         """
         if p.dim() > 1:
             p = (p / (p.std() + 1e-7)) * self.config_initializer_range
-            # return p
+            return p
 
-            # if isinstance(module, nn.Embedding):
-            #     return p
+            if isinstance(module, nn.Embedding):
+                return p
 
-            # sz = p.shape
+            sz = p.shape
 
-            # if len(sz) > 2 and sz[2] >= 11 and sz[0] == 1:
-            #     if self.debug_level:
-            #         assert module.__class__.__name__.lower().find('enc') >= 0, (sz, module, type(module))
-            #     return p  # do not normalize positional encoding weights
+            if len(sz) > 2 and sz[2] >= 11 and sz[0] == 1:
+                if self.debug_level:
+                    assert module.__class__.__name__.lower().find('enc') >= 0, (sz, module, type(module))
+                return p  # do not normalize positional encoding weights
 
-            # no_relu = len(sz) > 2 and (sz[1] == 1 or sz[2] < sz[3])
-            # if no_relu:
-            #     # layers not followed by relu
-            #     beta = 1.
-            # else:
-            #     # for layers followed by rely increase the weight scale
-            #     beta = 2.
+            no_relu = len(sz) > 2 and (sz[1] == 1 or sz[2] < sz[3])
+            if no_relu:
+                # layers not followed by relu
+                beta = 1.
+            else:
+                # for layers followed by rely increase the weight scale
+                beta = 2.
 
             # fan-out:
-            # p = p * (beta / (sz[0] * p[0, 0].numel())) ** 0.5
+            p = p * (beta / (sz[0] * p[0, 0].numel())) ** 0.5
 
             # fan-in:
-            # p = p * (beta / p[0].numel()) ** 0.5
+            p = p * (beta / p[0].numel()) ** 0.5
             
 
             # #### Specific in GPT-2 implementation

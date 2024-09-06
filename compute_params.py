@@ -94,49 +94,83 @@ params = []
 
 n_layers_list = []
 n_heads_list = []
-for i in tqdm(range(300)):
+for i in tqdm(range(200)):
     n_layer = np.random.randint(3, 10)
 
     ### GPT2
-    # if n_layer > 5:
-    #     dim_min = 72
-    #     dim_max = 176
+    # if n_layer > 6:
+    #     dim_min = 64
+    #     dim_max = 128
     # elif n_layer > 3:
     #     dim_min = 128
-    #     dim_max = 176
-    # else:
-    #     dim_min = 176
     #     dim_max = 256
+    # else:
+    #     dim_min = 256
+    #     dim_max = 384
     
     # n_embd = np.random.choice(np.arange(dim_min, dim_max+1, 8))
 
-    # if n_embd % 8 == 0:
+    # if n_embd % 10 == 0:
+    #     n_head = np.random.choice([10])
+    # elif n_embd % 8 == 0:
     #     n_head = np.random.choice([8])
     # elif n_embd % 6 == 0:
     #     n_head = np.random.choice([6])
     # elif n_embd % 4 == 0:
     #     n_head = 4
 
+    # OPTION 1
     if n_layer > 7:
         dim_min = 64
-        dim_max = 128
+        dim_max = 160
     elif n_layer > 5:
         dim_min = 128
-        dim_max = 192
-    else:
-        dim_min = 160
         dim_max = 256
+    else:
+        dim_min = 192
+        dim_max = 320
     
     n_embd = np.random.choice(np.arange(dim_min, dim_max+1, 8))
 
-    if n_embd % 8 == 0 and (n_embd / 8) % 2 == 0:
-        n_heads = 8
+
+    if n_embd % 10 == 0 and (n_embd / 10) % 2 == 0:
+        n_heads = np.random.choice([5, 10])
+    elif n_embd % 8 == 0 and (n_embd / 8) % 2 == 0:
+        n_heads = np.random.choice([4, 8])
     elif n_embd % 6 == 0 and (n_embd / 6) % 2 == 0:
-        n_heads = 6
+        n_heads = np.random.choice([3, 6])
     elif n_embd % 4 == 0 and (n_embd / 4) % 2 == 0:
         n_heads = 4
     else:
         n_heads = 2
+    ## OPTION 1
+
+    ## OPTION 2
+    # if n_layer > 7:
+    #     n_heads = np.random.choice([4,8,10])
+    #     ## make sure (n_embd/n_heads)%2 == 0
+    #     x_min = 2**3
+    #     x_max = 2**5
+    #     x_ = np.random.choice(np.arange(x_min, x_max+1, 8))
+    #     n_embd = x_ * n_heads
+
+    # elif n_layer > 5:
+    #     n_heads = np.random.choice([6,8])
+    #     x_min = 2**4
+    #     x_max = 2**6
+    #     x_ = np.random.choice(np.arange(x_min, x_max+1, 8))
+    #     n_embd = x_ * n_heads
+
+    # else:
+    #     n_heads = np.random.choice([8,10])
+    #     x_min = 2**4
+    #     x_max = 2**6
+    #     x_ = np.random.choice(np.arange(x_min, x_max+1, 8))
+    #     n_embd = x_ * n_heads
+    
+    ## OPTION 2
+
+    
     
     n_key_value_heads = np.random.choice([1, 2, int(n_heads/2), n_heads])
     

@@ -477,7 +477,7 @@ def main():
     else:
         print("***** LOAD from CHECKPOINT *****")
         model = AutoModelForCausalLM.from_config(config, trust_remote_code=model_args.trust_remote_code)
-        model.load_state_dict(torch.load('checkpoints/LoGAH-LLAMA3-WikiText103-r32-hid64-layers3-heads8-m2-8K-GQA-STEP2/llama3-medium_Epoch35.pt')['state_dict'])
+        model.load_state_dict(torch.load('checkpoints/LoGAH-LLAMA3-WikiText103-r32-hid64-layers3-heads8-m2-8K-GQA-STEP2/llama3-medium_Epoch100.pt')['state_dict'])
         print("***** LOAD from CHECKPOINT Done *****")
         print(config)
         # model = AutoModelForCausalLM.from_config(config, trust_remote_code=model_args.trust_remote_code)
